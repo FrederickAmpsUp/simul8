@@ -4,3 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.98"
+dialog = "0.3.0"
+egui = "0.27"
+egui-wgpu = "0.27"
+egui-winit = "0.27"
+env_logger = "0.11.8"
+log = "0.4.27"
+pollster = "0.4.0"
+wgpu = "24.0.0"
+winit = "0.29"
