@@ -17,7 +17,7 @@ pub struct AppState<'a> {
 }
 
 impl<'a> AppState<'a> {
-    pub async fn new(window: &'a winit::window::Window, event_loop: &winit::event_loop::EventLoop<()>) -> anyhow::Result<Self> {
+    pub async fn new(window: &'a winit::window::Window) -> anyhow::Result<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::default(), // possibly add web support in the future
             flags: wgpu::InstanceFlags::default(),
@@ -110,6 +110,18 @@ impl<'a> AppState<'a> {
             self.window_surface.configure(&self.device, &self.window_surface_config);
         }
 
+        let egui_input = self.egui_state.take_egui_input(&self.window);
+
+        let egui_output = self.egui_state.egui_ctx().run(egui_input, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.heading("simul8 test");
+                ui.label("winit/wgpu/egui");
+            });
+        });
+
+        self.egui_state.handle_platform_output(&self.window, egui_output.platform_output);
+        let paint_jobs = self.egui_state.egui_ctx().tessellate(egui_output.shapes, 1.0);
+
         let window_surface_texure = self.window_surface.get_current_texture()?;
 
         let window_surface_view = window_surface_texure.texture.create_view(&Default::default());
@@ -118,8 +130,30 @@ impl<'a> AppState<'a> {
             label: Some("Render encoder")
         });
 
+        let screen_desc = egui_wgpu::ScreenDescriptor {
+            size_in_pixels: [self.window_size.width, self.window_size.height],
+            pixels_per_point: 1.0
+        };
+
+        self.egui_renderer.update_buffers(
+            &self.device,
+            &self.queue,
+            &mut encoder,
+            &paint_jobs,
+            &screen_desc
+        );
+
+        for (id, image_delta) in &egui_output.textures_delta.set {
+            self.egui_renderer.update_texture(
+                &self.device,
+                &self.queue,
+                *id,
+                image_delta
+            );
+        }
+
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &window_surface_view,
@@ -138,10 +172,18 @@ impl<'a> AppState<'a> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            let mut render_pass = render_pass.forget_lifetime();
+
+            self.egui_renderer.render(&mut render_pass, &paint_jobs, &screen_desc);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
         window_surface_texure.present();
+
+        for id in &egui_output.textures_delta.free {
+            self.egui_renderer.free_texture(id);
+        }
 
         Ok(())
     }

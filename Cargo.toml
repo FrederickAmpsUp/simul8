@@ -5,12 +5,33 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-dialog = "0.3.0"
-egui = "0.27"
-egui-wgpu = "0.27"
-egui-winit = "0.27"
+cfg-if = "1.0.0"
+egui-wgpu = "0.31.1"
+egui-winit = "0.31.1"
 env_logger = "0.11.8"
 log = "0.4.27"
 pollster = "0.4.0"
 wgpu = "24.0.0"
-winit = "0.29"
+winit = "0.30"
+
+[dependencies.egui]
+version = "0.31.1"
+default-features = false
+features = ["web"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+console_log = "1.0"
+wgpu = { version = "24.0.0", features=["webgl"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.30"
+web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+dialog = "0.3.0"
+
+[profile.release]
+strip = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
