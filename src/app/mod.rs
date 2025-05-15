@@ -18,13 +18,19 @@ pub struct AppState<'a> {
 
 impl<'a> AppState<'a> {
     pub async fn new(window: &'a winit::window::Window) -> anyhow::Result<Self> {
+        log::info!("App initialization");
+
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::default(), // possibly add web support in the future
             flags: wgpu::InstanceFlags::default(),
             backend_options: wgpu::BackendOptions::from_env_or_default()
         });
 
+        log::info!(" - WGPU instance acquired.");
+
         let window_surface = instance.create_surface(window)?;
+
+        log::info!(" - Window surface created.");
 
         let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -32,13 +38,17 @@ impl<'a> AppState<'a> {
             force_fallback_adapter: false
         }).await.ok_or(anyhow::anyhow!("Failed to get adapter"))?;
 
+        log::info!(" - Acquired adapter \"{}\"", adapter.get_info().name);
+
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
-            required_limits: wgpu::Limits::default(),
+            required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
             required_features: wgpu::Features::empty(),
 
             label: None,
             memory_hints: Default::default()
         }, None).await?;
+
+        log::info!(" - Acquired device and queue!");
 
         let window_surface_caps = window_surface.get_capabilities(&adapter);
 
@@ -46,6 +56,10 @@ impl<'a> AppState<'a> {
             .find(|f| f.is_srgb())
             .copied()
             .unwrap_or(window_surface_caps.formats[0]);
+
+        if !window_surface_format.is_srgb() {
+            log::warn!("No surface format found supporting sRGB!");
+        }
 
         let window_size = window.inner_size();
 
@@ -76,6 +90,8 @@ impl<'a> AppState<'a> {
             1, false
         );
 
+        log::info!(" - Created EGUI objects.");
+
         Ok(Self {
             window_surface,
             window_surface_config, window_size,
@@ -92,6 +108,7 @@ impl<'a> AppState<'a> {
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
+            log::info!("Resize to {}x{} requested.", new_size.width, new_size.height);
             self.window_size = new_size;
             self.needs_reconfigure = true;
         }
@@ -108,6 +125,8 @@ impl<'a> AppState<'a> {
             self.window_surface_config.height = self.window_size.height;
 
             self.window_surface.configure(&self.device, &self.window_surface_config);
+
+            log::info!("Reconfigured window surface (size {}x{})", self.window_surface_config.width, self.window_surface_config.height);
         }
 
         let egui_input = self.egui_state.take_egui_input(&self.window);

@@ -7,17 +7,17 @@ edition = "2024"
 anyhow = "1.0.98"
 cfg-if = "1.0.0"
 egui-wgpu = "0.31.1"
-egui-winit = "0.31.1"
+egui = "0.31.1"
 env_logger = "0.11.8"
 log = "0.4.27"
 pollster = "0.4.0"
 wgpu = "24.0.0"
 winit = "0.30"
 
-[dependencies.egui]
+[dependencies.egui-winit]
 version = "0.31.1"
 default-features = false
-features = ["web"]
+features = ["bytemuck", "links", "x11", "wayland"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
