@@ -23,7 +23,7 @@ jobs:
 
   build-web:
     name: Build (web)
-    runs-on: ubuntu-latest
+    runs-on: debian-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -33,12 +33,6 @@ jobs:
 
       - name: Install wasm-pack
         run: cargo install wasm-pack
-      
-      - name: Install latest wasm-opt
-        run: |
-          curl -LO https://github.com/WebAssembly/binaryen/releases/download/version_118/binaryen-version_118-x86_64-linux.tar.gz
-          tar -xzf binaryen-version_118-x86_64-linux.tar.gz
-          echo "$PWD/binaryen-version_118/bin" >> $GITHUB_PATH
       
       - name: Build
         run: wasm-pack build --target web --release
