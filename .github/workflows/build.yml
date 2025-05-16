@@ -1,0 +1,54 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-native:
+    name: Build (native)
+    runs-on: {{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions-rs/toolchain@v1
+            with:
+              toolchain: stable
+
+          - name: Build
+            run: cargo build --release
+
+  build-web:
+    name: Build (web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+
+      - name: Build
+        run: wasm-pack build --target web --release
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pkg
+
+  deploy:
+    name: Deploy to Github Pages
+    needs: build-web
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    uses: actions/deploy-pages@v4
