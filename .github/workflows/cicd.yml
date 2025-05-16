@@ -23,7 +23,7 @@ jobs:
 
   build-web:
     name: Build (web)
-    runs-on: debian-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
