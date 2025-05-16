@@ -12,14 +12,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     
-        steps:
-          - uses: actions/checkout@v4
-          - uses: actions-rs/toolchain@v1
-            with:
-              toolchain: stable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
 
-          - name: Build
-            run: cargo build --release
+      - name: Build
+        run: cargo build --release
 
   build-web:
     name: Build (web)
