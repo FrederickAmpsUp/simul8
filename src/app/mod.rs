@@ -21,7 +21,7 @@ impl<'a> AppState<'a> {
         log::info!("App initialization");
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::default(), // possibly add web support in the future
+            backends: wgpu::Backends::default(),
             flags: wgpu::InstanceFlags::default(),
             backend_options: wgpu::BackendOptions::from_env_or_default()
         });
@@ -48,7 +48,7 @@ impl<'a> AppState<'a> {
             memory_hints: Default::default()
         }, None).await?;
 
-        log::info!(" - Acquired device and queue!");
+        log::info!(" - Acquired device and queue.");
 
         let window_surface_caps = window_surface.get_capabilities(&adapter);
 
@@ -118,6 +118,49 @@ impl<'a> AppState<'a> {
         self.needs_reconfigure = true;
     }
 
+    pub fn build_ui(&mut self, egui_input: egui::RawInput) -> egui::FullOutput {
+        let preview_aspect = 9.0 / 16.0;
+
+        let mut time = 0.0;
+
+        self.egui_state.egui_ctx().run(egui_input, |ctx| {
+            egui::SidePanel::left("tools_panel").resizable(true).show(ctx, |ui| {
+                ui.heading("Tools");
+
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("Lorem ipsum dolor sit amet");
+                });
+            });
+
+            egui::TopBottomPanel::bottom("timeline_panel").resizable(true).show(ctx, |ui| {
+                ui.add_sized(
+                    egui::Vec2::new(ui.available_width(), 24.0), // TODO: pick height better
+                    egui::Slider::new(&mut time, 0.0..=1.0)
+                        .show_value(false)
+                        .text("")
+                );
+            });
+
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let available_size = ui.available_size();
+
+                let preview_height = available_size.y;
+                let preview_width = preview_height * preview_aspect;
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let (rect, _response) = ui.allocate_exact_size(
+                        egui::Vec2::new(preview_width, preview_height),
+                        egui::Sense::hover()
+                    );
+                    
+                    if ui.is_rect_visible(rect) {
+                        ui.painter().rect_filled(rect, preview_width / 1080.0 * 32.0, egui::Color32::from_rgb(100, 150, 200));
+                    }
+                });
+            });
+        })
+    }
+
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         if self.needs_reconfigure {
             self.needs_reconfigure = false;
@@ -129,17 +172,17 @@ impl<'a> AppState<'a> {
             log::info!("Reconfigured window surface (size {}x{})", self.window_surface_config.width, self.window_surface_config.height);
         }
 
+        let ppp = self.window.scale_factor() as f32;
+
+        self.egui_state.egui_ctx().set_pixels_per_point(ppp);
+        //self.egui_state.egui_ctx().set_debug_on_hover(true);
+
         let egui_input = self.egui_state.take_egui_input(&self.window);
 
-        let egui_output = self.egui_state.egui_ctx().run(egui_input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.heading("simul8 test");
-                ui.label("winit/wgpu/egui");
-            });
-        });
+        let egui_output = self.build_ui(egui_input);
 
         self.egui_state.handle_platform_output(&self.window, egui_output.platform_output);
-        let paint_jobs = self.egui_state.egui_ctx().tessellate(egui_output.shapes, 1.0);
+        let paint_jobs = self.egui_state.egui_ctx().tessellate(egui_output.shapes, ppp);
 
         let window_surface_texure = self.window_surface.get_current_texture()?;
 
@@ -151,7 +194,7 @@ impl<'a> AppState<'a> {
 
         let screen_desc = egui_wgpu::ScreenDescriptor {
             size_in_pixels: [self.window_size.width, self.window_size.height],
-            pixels_per_point: 1.0
+            pixels_per_point: ppp
         };
 
         self.egui_renderer.update_buffers(

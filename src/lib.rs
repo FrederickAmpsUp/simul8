@@ -10,6 +10,8 @@ use wasm_bindgen::prelude::*;
 pub fn setup() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(log::Level::Info).expect("Failed to initialize logger!");
+
+    log::info!("Setup logging & panic system");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
