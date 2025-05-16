@@ -52,5 +52,6 @@ jobs:
     permissions:
       pages: write
       id-token: write
-
-    uses: actions/deploy-pages@v4
+   
+    steps:
+    - uses: actions/deploy-pages@v4
