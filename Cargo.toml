@@ -13,6 +13,7 @@ log = "0.4.27"
 pollster = "0.4.0"
 wgpu = "24.0.0"
 winit = "0.30"
+glam = "0.30.3"
 
 [dependencies.egui-winit]
 version = "0.31.1"

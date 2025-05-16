@@ -184,8 +184,6 @@ impl<'a> AppState<'a> {
                     let tick_pos = egui::remap(v, self.timeline_range.clone(), slider_left..=slider_right);
                     let h = if i % 4 == 0 { tick_major_height } else { tick_minor_height } / 2.0;
 
-                    log::info!("{}", tick_pos);
-
                     if i % 4 == 0 {
                         painter.text(egui::pos2(tick_pos, slider_cy + h*1.5), egui::Align2::CENTER_CENTER, v.to_string(), egui::FontId::default(), egui::Color32::GRAY);
                     }

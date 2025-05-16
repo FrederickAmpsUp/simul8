@@ -1,5 +1,6 @@
 pub mod app;
 pub mod util;
+pub mod sim;
 
 use anyhow::Context;
 
