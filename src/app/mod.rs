@@ -148,8 +148,14 @@ impl<'a> AppState<'a> {
                 .show(ctx, |ui| {
                 let (rect, response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
 
-                let slider_left = rect.left();
-                let slider_right = rect.right();
+                let slider_left = rect.left() + rect.width()*0.05;
+                let slider_right = rect.right() - rect.width()*0.05;
+
+                let playhead_width = rect.width() * 0.01;
+                let playhead_height = rect.height() * 0.9;
+
+                let slider_top = rect.top();
+                let slider_bottom = rect.bottom();
 
                 let slider_cy = rect.top() + rect.height()*0.5;
 
@@ -157,12 +163,17 @@ impl<'a> AppState<'a> {
 
                 if response.dragged() || response.clicked() {
                     if let Some(pos) = response.interact_pointer_pos() {
-                        let relative_x = pos.x - rect.left();
-                        self.slider_pos = egui::remap_clamp(relative_x, slider_left..=slider_right, 0.0..=1.0);
+                        if rect.contains(pos) || rect.contains(ui.input(|i| i.pointer.press_origin().unwrap_or(egui::pos2(rect.left()-1.0, rect.top()-1.0)))) {
+                            self.slider_pos = egui::remap_clamp(pos.x, slider_left..=slider_right, 0.0..=1.0);
+                        }
                     }
                 }
 
                 painter.line_segment([egui::pos2(slider_left, slider_cy), egui::pos2(slider_right, slider_cy)], egui::Stroke::new(1.0, egui::Color32::WHITE));
+
+                let playhead_pos = egui::remap(self.slider_pos, 0.0..=1.0, slider_left..=slider_right);
+
+                painter.rect_filled(egui::Rect::from_center_size(egui::pos2(playhead_pos, slider_cy), egui::vec2(playhead_width, playhead_height)), 0.0, egui::Color32::LIGHT_GRAY);
 
             });
 
