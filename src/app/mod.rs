@@ -13,6 +13,8 @@ pub struct AppState<'a> {
     egui_state: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
 
+    slider_pos: f32,
+
     window: &'a winit::window::Window
 }
 
@@ -102,6 +104,8 @@ impl<'a> AppState<'a> {
 
             egui_state, egui_renderer,
 
+            slider_pos: 0.0,
+
             window
         })
     }
@@ -121,8 +125,6 @@ impl<'a> AppState<'a> {
     pub fn build_ui(&mut self, egui_input: egui::RawInput) -> egui::FullOutput {
         let preview_aspect = 9.0 / 16.0;
 
-        let mut time = 0.0;
-
         self.egui_state.egui_ctx().run(egui_input, |ctx| {
             egui::SidePanel::left("tools_panel").resizable(true).show(ctx, |ui| {
                 ui.heading("Tools");
@@ -132,13 +134,36 @@ impl<'a> AppState<'a> {
                 });
             });
 
-            egui::TopBottomPanel::bottom("timeline_panel").resizable(true).show(ctx, |ui| {
-                ui.add_sized(
-                    egui::Vec2::new(ui.available_width(), 24.0), // TODO: pick height better
-                    egui::Slider::new(&mut time, 0.0..=1.0)
-                        .show_value(false)
-                        .text("")
-                );
+            let available_height = ctx.available_rect().height();
+
+            let timeline_max_ratio = 1.0 / 5.0;
+            let timeline_min_ratio = (3.0/8.0) / 5.0;
+
+            let timeline_max_height = available_height * timeline_max_ratio;
+            let timeline_min_height = available_height * timeline_min_ratio;
+
+            egui::TopBottomPanel::bottom("timeline_panel")
+                .resizable(true)
+                .max_height(timeline_max_height).min_height(timeline_min_height)
+                .show(ctx, |ui| {
+                let (rect, response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
+
+                let slider_left = rect.left();
+                let slider_right = rect.right();
+
+                let slider_cy = rect.top() + rect.height()*0.5;
+
+                let painter = ui.painter();
+
+                if response.dragged() || response.clicked() {
+                    if let Some(pos) = response.interact_pointer_pos() {
+                        let relative_x = pos.x - rect.left();
+                        self.slider_pos = egui::remap_clamp(relative_x, slider_left..=slider_right, 0.0..=1.0);
+                    }
+                }
+
+                painter.line_segment([egui::pos2(slider_left, slider_cy), egui::pos2(slider_right, slider_cy)], egui::Stroke::new(1.0, egui::Color32::WHITE));
+
             });
 
             egui::CentralPanel::default().show(ctx, |ui| {
