@@ -35,7 +35,7 @@ jobs:
         run: cargo install wasm-pack
       
       - name: Build
-        run: wasm-pack build --target web --release
+        run: wasm-pack build --target web --release --no-wasm-opt # desperately need to figure out how to get wasm-opt to quit whining
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
