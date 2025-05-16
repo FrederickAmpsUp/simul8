@@ -9,6 +9,8 @@ pub trait Constraint {
     fn constrain(&self, particle: &mut Particle);
 }
 
+pub mod rendering;
+
 pub struct SimulationState<'a> {
     particles: Vec<Particle>,
     constraints: Vec<Box<dyn Constraint + 'a>>,

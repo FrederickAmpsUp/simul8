@@ -16,6 +16,9 @@ pub struct AppState<'a> {
     timeline_pos: f32,
     timeline_range: std::ops::RangeInclusive<f32>,
 
+    pub sim_state: crate::sim::SimulationState<'a>,
+    sim_renderer: Box<dyn crate::sim::rendering::SimRenderer>,
+
     window: &'a winit::window::Window
 }
 
@@ -95,6 +98,9 @@ impl<'a> AppState<'a> {
 
         log::info!(" - Created EGUI objects.");
 
+        let sim_state = crate::sim::SimulationState::new();
+        let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
+
         Ok(Self {
             window_surface,
             window_surface_config, window_size,
@@ -107,6 +113,8 @@ impl<'a> AppState<'a> {
 
             timeline_pos: 0.0,
             timeline_range: 0.0..=3.5,
+
+            sim_state, sim_renderer,
 
             window
         })
@@ -203,15 +211,14 @@ impl<'a> AppState<'a> {
                 let preview_height = available_size.y;
                 let preview_width = preview_height * preview_aspect;
 
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let (rect, _response) = ui.allocate_exact_size(
-                        egui::Vec2::new(preview_width, preview_height),
-                        egui::Sense::hover()
-                    );
-                    
-                    if ui.is_rect_visible(rect) {
-                        ui.painter().rect_filled(rect, preview_width / 1080.0 * 32.0, egui::Color32::from_rgb(100, 150, 200));
-                    }
+                egui::SidePanel::right("preview_panel")
+                    .exact_width(preview_width)
+                    .show_inside(ui, |ui| {
+                    self.sim_renderer.render(&self.sim_state, ui);
+                });
+
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    ui.heading("Other Stuff...");
                 });
             });
         })

@@ -62,7 +62,15 @@ pub async fn run() -> anyhow::Result<()> {
 
     let window = configure_window_postcreate(window)?;
 
-    let app_state = app::AppState::new(&window).await?;
+    let mut app_state = app::AppState::new(&window).await?;
+
+    app_state.sim_state.add_particle(sim::Particle {
+        position: glam::Vec2::ZERO,
+        last_position: glam::Vec2::ZERO,
+    
+        radius: 0.1,
+        color: egui::Color32::RED
+    });
 
     app_state.run(event_loop)
 }
