@@ -13,7 +13,8 @@ pub struct AppState<'a> {
     egui_state: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
 
-    slider_pos: f32,
+    timeline_pos: f32,
+    timeline_range: std::ops::RangeInclusive<f32>,
 
     window: &'a winit::window::Window
 }
@@ -104,7 +105,8 @@ impl<'a> AppState<'a> {
 
             egui_state, egui_renderer,
 
-            slider_pos: 0.0,
+            timeline_pos: 0.0,
+            timeline_range: 0.0..=3.5,
 
             window
         })
@@ -159,21 +161,41 @@ impl<'a> AppState<'a> {
 
                 let slider_cy = rect.top() + rect.height()*0.5;
 
+                let tick_major_height = playhead_height / 2.0;
+                let tick_minor_height = tick_major_height / 2.0;
+
                 let painter = ui.painter();
 
                 if response.dragged() || response.clicked() {
                     if let Some(pos) = response.interact_pointer_pos() {
                         if rect.contains(pos) || rect.contains(ui.input(|i| i.pointer.press_origin().unwrap_or(egui::pos2(rect.left()-1.0, rect.top()-1.0)))) {
-                            self.slider_pos = egui::remap_clamp(pos.x, slider_left..=slider_right, 0.0..=1.0);
+                            self.timeline_pos = egui::remap_clamp(pos.x, slider_left..=slider_right, self.timeline_range.clone());
                         }
                     }
                 }
 
-                painter.line_segment([egui::pos2(slider_left, slider_cy), egui::pos2(slider_right, slider_cy)], egui::Stroke::new(1.0, egui::Color32::WHITE));
+                painter.line_segment([egui::pos2(slider_left, slider_cy), egui::pos2(slider_right, slider_cy)], egui::Stroke::new(1.0, egui::Color32::GRAY));
 
-                let playhead_pos = egui::remap(self.slider_pos, 0.0..=1.0, slider_left..=slider_right);
+                let tick_count = ((self.timeline_range.end() - self.timeline_range.start()) * 4.0).floor() as usize;
 
-                painter.rect_filled(egui::Rect::from_center_size(egui::pos2(playhead_pos, slider_cy), egui::vec2(playhead_width, playhead_height)), 0.0, egui::Color32::LIGHT_GRAY);
+                for i in 0..=tick_count {
+                    let v = self.timeline_range.start() + (i as f32 * 0.25);
+
+                    let tick_pos = egui::remap(v, self.timeline_range.clone(), slider_left..=slider_right);
+                    let h = if i % 4 == 0 { tick_major_height } else { tick_minor_height } / 2.0;
+
+                    log::info!("{}", tick_pos);
+
+                    if i % 4 == 0 {
+                        painter.text(egui::pos2(tick_pos, slider_cy + h*1.5), egui::Align2::CENTER_CENTER, v.to_string(), egui::FontId::default(), egui::Color32::GRAY);
+                    }
+
+                    painter.line_segment([egui::pos2(tick_pos, slider_cy+h), egui::pos2(tick_pos, slider_cy-h)], egui::Stroke::new(1.0, egui::Color32::GRAY));
+                }
+
+                let playhead_pos = egui::remap(self.timeline_pos, self.timeline_range.clone(), slider_left..=slider_right);
+
+                painter.rect_filled(egui::Rect::from_center_size(egui::pos2(playhead_pos, slider_cy), egui::vec2(playhead_width, playhead_height)), playhead_width/3.0, egui::Color32::WHITE);
 
             });
 
