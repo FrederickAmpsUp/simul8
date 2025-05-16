@@ -98,7 +98,9 @@ impl<'a> AppState<'a> {
 
         log::info!(" - Created EGUI objects.");
 
-        let sim_state = crate::sim::SimulationState::new();
+        let mut sim_state = crate::sim::SimulationState::new();
+        sim_state.gravity_accel = glam::vec2(0.0, 0.1);
+
         let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
 
         Ok(Self {
@@ -225,6 +227,8 @@ impl<'a> AppState<'a> {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        self.sim_state.solve_pbd(1.0/60.0);
+
         if self.needs_reconfigure {
             self.needs_reconfigure = false;
             self.window_surface_config.width = self.window_size.width;

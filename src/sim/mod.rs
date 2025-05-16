@@ -15,7 +15,7 @@ pub struct SimulationState<'a> {
     particles: Vec<Particle>,
     constraints: Vec<Box<dyn Constraint + 'a>>,
     
-    gravity_accel: glam::Vec2
+    pub gravity_accel: glam::Vec2
 }
 
 impl<'a> SimulationState<'a> {
