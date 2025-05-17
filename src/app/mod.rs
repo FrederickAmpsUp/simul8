@@ -1,4 +1,5 @@
 use winit::event::{Event, WindowEvent};
+use anyhow::Context;
 
 #[allow(dead_code)]
 pub struct AppState<'a> {
@@ -16,7 +17,10 @@ pub struct AppState<'a> {
     timeline_pos: f32,
     timeline_range: std::ops::RangeInclusive<f32>,
 
-    pub sim_state: crate::sim::SimulationState<'a>,
+    pub sim_state: Option<crate::sim::SimulationState>,
+
+    sim_render_rx: futures::channel::mpsc::Receiver<crate::sim::SimulationRenderState>,
+    sim_render_state: crate::sim::SimulationRenderState,
     sim_renderer: Box<dyn crate::sim::rendering::SimRenderer>,
 
     window: &'a winit::window::Window
@@ -98,7 +102,9 @@ impl<'a> AppState<'a> {
 
         log::info!(" - Created EGUI objects.");
 
-        let mut sim_state = crate::sim::SimulationState::new();
+        let (sim_render_tx, sim_render_rx) = futures::channel::mpsc::channel(16);
+
+        let mut sim_state = crate::sim::SimulationState::new(Some(sim_render_tx));
         sim_state.gravity_accel = glam::vec2(0.0, 0.1);
 
         let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
@@ -116,7 +122,9 @@ impl<'a> AppState<'a> {
             timeline_pos: 0.0,
             timeline_range: 0.0..=3.5,
 
-            sim_state, sim_renderer,
+            sim_render_state: sim_state.get_render_state(),
+            sim_render_rx,
+            sim_state: Some(sim_state), sim_renderer,
 
             window
         })
@@ -132,6 +140,12 @@ impl<'a> AppState<'a> {
 
     pub fn reconfigure(&mut self) {
         self.needs_reconfigure = true;
+    }
+
+    pub fn update_sim_render_state(&mut self) {
+        if let Ok(Some(sim_render_state)) = self.sim_render_rx.try_next() {
+            self.sim_render_state = sim_render_state;
+        }
     }
 
     pub fn build_ui(&mut self, egui_input: egui::RawInput) -> egui::FullOutput {
@@ -216,7 +230,7 @@ impl<'a> AppState<'a> {
                 egui::SidePanel::right("preview_panel")
                     .exact_width(preview_width)
                     .show_inside(ui, |ui| {
-                    self.sim_renderer.render(&self.sim_state, ui);
+                    self.sim_renderer.render(&self.sim_render_state, ui);
                 });
 
                 egui::CentralPanel::default().show_inside(ui, |ui| {
@@ -227,8 +241,6 @@ impl<'a> AppState<'a> {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.sim_state.solve_pbd(1.0/60.0);
-
         if self.needs_reconfigure {
             self.needs_reconfigure = false;
             self.window_surface_config.width = self.window_size.width;
@@ -325,6 +337,16 @@ impl<'a> AppState<'a> {
         let mut exit_status: anyhow::Result<()> = Ok(());
         let exit = &mut exit_status;
 
+        let mut sim_state = Box::new(self.sim_state.take().context("unreachable")?);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = std::thread::spawn(move || {
+                loop {
+                    sim_state.single_step(1.0/60.0);
+                }
+            });
+        }
+
         #[allow(deprecated)]
         event_loop.run(move |event, control_flow| {
             match event {
@@ -340,6 +362,11 @@ impl<'a> AppState<'a> {
                         WindowEvent::CloseRequested => control_flow.exit(),
 
                         WindowEvent::RedrawRequested => {
+                            #[cfg(target_arch = "wasm32")]
+                            sim_state.single_step(1.0/60.0);
+                            
+                            self.update_sim_render_state();
+                            
                             match self.render() {
                                 Ok(_) => {},
                                 Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => self.reconfigure(),

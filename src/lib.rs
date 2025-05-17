@@ -64,7 +64,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     let mut app_state = app::AppState::new(&window).await?;
 
-    app_state.sim_state.add_particle(sim::Particle {
+    app_state.sim_state.as_mut().expect("").add_particle(sim::Particle {
         position: glam::Vec2::ZERO,
         last_position: glam::Vec2::ZERO,
     

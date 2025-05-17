@@ -10,7 +10,7 @@ impl Viewport {
 }
 
 pub trait SimRenderer {
-    fn render(&self, sim: &super::SimulationState, ui: &mut egui::Ui);
+    fn render(&self, sim: &super::SimulationRenderState, ui: &mut egui::Ui);
 }
 
 pub struct CpuSimRenderer {
@@ -26,7 +26,7 @@ impl CpuSimRenderer {
 }
 
 impl SimRenderer for CpuSimRenderer {
-    fn render(&self, sim: &super::SimulationState, ui: &mut egui::Ui) {
+    fn render(&self, sim: &super::SimulationRenderState, ui: &mut egui::Ui) {
         let vw = ui.available_width();
         let vh = ui.available_height();
 
