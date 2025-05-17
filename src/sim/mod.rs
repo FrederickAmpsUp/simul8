@@ -18,7 +18,7 @@ pub struct SimulationState {
     
     pub gravity_accel: glam::Vec2,
 
-    sim_render_tx: Option<futures::channel::mpsc::Sender<SimulationRenderState>>
+    sim_render_tx: Option<crate::util::OverwriteSlot<SimulationRenderState>>
 }
 
 pub struct SimulationRenderState {
@@ -26,7 +26,7 @@ pub struct SimulationRenderState {
 }
 
 impl SimulationState {
-    pub fn new(sim_render_tx: Option<futures::channel::mpsc::Sender<SimulationRenderState>>) -> Self {
+    pub fn new(sim_render_tx: Option<crate::util::OverwriteSlot<SimulationRenderState>>) -> Self {
         Self {
             particles: vec![],
             constraints: vec![],
@@ -68,10 +68,9 @@ impl SimulationState {
     }
 
     fn update_render_state(&mut self) {
-        if let Some(mut tx) = self.sim_render_tx.clone() {
-            use futures::SinkExt;
+        if let Some(tx) = &self.sim_render_tx {
             let state = self.get_render_state();
-            crate::util::spawn(async move { let _ = tx.send(state).await; () });
+            tx.write(state);
         }
     }
     

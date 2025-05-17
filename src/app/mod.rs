@@ -19,7 +19,7 @@ pub struct AppState<'a> {
 
     pub sim_state: Option<crate::sim::SimulationState>,
 
-    sim_render_rx: futures::channel::mpsc::Receiver<crate::sim::SimulationRenderState>,
+    sim_render_rx: crate::util::OverwriteSlot<crate::sim::SimulationRenderState>,
     sim_render_state: crate::sim::SimulationRenderState,
     sim_renderer: Box<dyn crate::sim::rendering::SimRenderer>,
 
@@ -102,7 +102,7 @@ impl<'a> AppState<'a> {
 
         log::info!(" - Created EGUI objects.");
 
-        let (sim_render_tx, sim_render_rx) = futures::channel::mpsc::channel(16);
+        let (sim_render_tx, sim_render_rx) = crate::util::OverwriteSlot::new();
 
         let mut sim_state = crate::sim::SimulationState::new(Some(sim_render_tx));
         sim_state.gravity_accel = glam::vec2(0.0, 0.1);
@@ -143,7 +143,7 @@ impl<'a> AppState<'a> {
     }
 
     pub fn update_sim_render_state(&mut self) {
-        if let Ok(Some(sim_render_state)) = self.sim_render_rx.try_next() {
+        if let Some(sim_render_state) = self.sim_render_rx.try_read() {
             self.sim_render_state = sim_render_state;
         }
     }
@@ -180,8 +180,8 @@ impl<'a> AppState<'a> {
                 let playhead_width = rect.width() * 0.01;
                 let playhead_height = rect.height() * 0.9;
 
-                let slider_top = rect.top();
-                let slider_bottom = rect.bottom();
+                let _slider_top = rect.top();
+                let _slider_bottom = rect.bottom();
 
                 let slider_cy = rect.top() + rect.height()*0.5;
 
@@ -333,19 +333,26 @@ impl<'a> AppState<'a> {
         self.window
     }
 
+    pub fn sim_state(&self) -> &crate::sim::SimulationState {
+        self.sim_state.as_ref().unwrap()
+    }
+
+    pub fn sim_state_mut(&mut self) -> &mut crate::sim::SimulationState {
+        self.sim_state.as_mut().unwrap()
+    }
+
     pub fn run(mut self, event_loop: winit::event_loop::EventLoop<()>) -> anyhow::Result<()> {
         let mut exit_status: anyhow::Result<()> = Ok(());
         let exit = &mut exit_status;
 
         let mut sim_state = Box::new(self.sim_state.take().context("unreachable")?);
         #[cfg(not(target_arch = "wasm32"))]
-        {
-            let _ = std::thread::spawn(move || {
-                loop {
-                    sim_state.single_step(1.0/60.0);
-                }
-            });
-        }
+        let _ = std::thread::spawn(move || {
+            loop {
+                sim_state.single_step(1.0/60.0);
+                std::thread::sleep(std::time::Duration::from_millis(16));
+            }
+        });
 
         #[allow(deprecated)]
         event_loop.run(move |event, control_flow| {
