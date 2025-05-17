@@ -1,4 +1,6 @@
 pub mod rendering;
+pub mod event;
+pub mod constraints;
 
 #[derive(Clone)]
 pub struct Particle {
@@ -6,6 +8,16 @@ pub struct Particle {
     pub last_position: glam::Vec2,
     pub radius: f32,
     pub color: egui::Color32
+}
+
+impl Particle {
+    pub fn new(position: glam::Vec2, radius: f32, color: egui::Color32) -> Self {
+        Self {
+            position,
+            last_position: position,
+            radius, color
+        }
+    }
 }
 
 pub trait Constraint: Send {
@@ -16,6 +28,8 @@ pub struct SimulationState {
     particles: Vec<Particle>,
     constraints: Vec<Box<dyn Constraint>>,
     
+    trigger_managers: Vec<event::TriggerManager>,
+
     pub gravity_accel: glam::Vec2,
 
     sim_render_tx: Option<crate::util::OverwriteSlot<SimulationRenderState>>
@@ -30,6 +44,7 @@ impl SimulationState {
         Self {
             particles: vec![],
             constraints: vec![],
+            trigger_managers: vec![],
             gravity_accel: glam::Vec2::ZERO,
             sim_render_tx
         }
@@ -40,6 +55,10 @@ impl SimulationState {
     }
     pub fn add_constraint(&mut self, constraint: impl Constraint + 'static) {
         self.constraints.push(Box::new(constraint));
+    }
+
+    pub fn add_trigger_manager(&mut self, manager: event::TriggerManager) {
+        self.trigger_managers.push(manager);
     }
 
     fn solve_constraints(&mut self, steps: u32) {
@@ -63,7 +82,16 @@ impl SimulationState {
         self.solve_constraints(1);
     }
 
+    fn update_triggers(&mut self) {
+        let tms: Vec<event::TriggerManager> = self.trigger_managers.drain(..).collect();
+        for tm in &tms {
+            tm.process(self);
+        }
+        self.trigger_managers = tms;
+    }
+
     fn step(&mut self, dt: f32) {
+        self.update_triggers();
         self.solve_pbd(dt);
     }
 

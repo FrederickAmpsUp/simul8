@@ -105,7 +105,7 @@ impl<'a> AppState<'a> {
         let (sim_render_tx, sim_render_rx) = crate::util::OverwriteSlot::new();
 
         let mut sim_state = crate::sim::SimulationState::new(Some(sim_render_tx));
-        sim_state.gravity_accel = glam::vec2(0.0, 0.1);
+        sim_state.gravity_accel = glam::vec2(0.0, 0.5);
 
         let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
 

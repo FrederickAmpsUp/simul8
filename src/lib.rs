@@ -63,12 +63,19 @@ pub async fn run() -> anyhow::Result<()> {
     let mut app_state = app::AppState::new(&window).await?;
 
     app_state.sim_state_mut().add_particle(sim::Particle {
-        position: glam::Vec2::ZERO,
+        position: glam::vec2(-0.5, 0.0),
         last_position: glam::Vec2::ZERO,
     
-        radius: 0.1,
+        radius: 0.05,
         color: egui::Color32::RED
     });
+
+    app_state.sim_state_mut().add_trigger_manager(sim::event::TriggerManager::new(
+        Box::new(sim::event::AnyLeftCircleTrigger::new(1.0)),
+        vec![Box::new(sim::event::SpawnEvent)]
+    ));
+
+    app_state.sim_state_mut().add_constraint(sim::constraints::CircleConstraint::new(1.0));
 
     app_state.run(event_loop)
 }
