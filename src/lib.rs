@@ -20,6 +20,7 @@ pub fn setup() {
 
 #[cfg(target_arch = "wasm32")]
 pub fn configure_window_postcreate(window: winit::window::Window) -> anyhow::Result<winit::window::Window> {
+    use anyhow::Context;
     use winit::platform::web::WindowExtWebSys;
 
     web_sys::window()
@@ -63,7 +64,7 @@ pub async fn run() -> anyhow::Result<()> {
     let mut app_state = app::AppState::new(&window).await?;
 
     app_state.sim_state_mut().add_particle(sim::Particle {
-        position: glam::vec2(-0.5, 0.0),
+        position: glam::vec2(-0.5, -0.5)/60.0,
         last_position: glam::Vec2::ZERO,
     
         radius: 0.05,

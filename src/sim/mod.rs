@@ -20,8 +20,27 @@ impl Particle {
     }
 }
 
-pub trait Constraint: Send {
+pub trait ConstraintClone {
+    fn clone_box(& self) -> Box<dyn Constraint>;
+}
+
+pub trait Constraint: Send + ConstraintClone {
     fn constrain(&self, particle: &mut Particle);
+    fn draw(&self, _renderer: &dyn rendering::SimRenderer, _ui: &mut egui::Ui, _r: &rendering::RenderState) {}
+}
+
+impl<T> ConstraintClone for T
+where T: Constraint + Clone + 'static
+{
+    fn clone_box(& self) -> Box<dyn Constraint> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Constraint> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 pub struct SimulationState {
@@ -36,7 +55,8 @@ pub struct SimulationState {
 }
 
 pub struct SimulationRenderState {
-    particles: Vec<Particle>
+    particles: Vec<Particle>,
+    constraints: Vec<Box<dyn Constraint>>,
 }
 
 impl SimulationState {
@@ -115,6 +135,6 @@ impl SimulationState {
     }
 
     pub fn get_render_state(&self) -> SimulationRenderState {
-        SimulationRenderState { particles: self.particles.clone() }
+        SimulationRenderState { particles: self.particles.clone(), constraints: self.constraints.clone() }
     }
 }
