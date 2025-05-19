@@ -48,10 +48,14 @@ impl<'a> AppState<'a> {
             force_fallback_adapter: false
         }).await.ok_or(anyhow::anyhow!("Failed to get adapter"))?;
 
-        log::info!(" - Acquired adapter \"{}\"", adapter.get_info().name);
+        log::info!(" - Acquired adapter \"{}\" with backend \"{}\"", adapter.get_info().name, adapter.get_info().backend);
 
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+            #[cfg(target_arch = "wasm32")]
             required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+            #[cfg(not(target_arch = "wasm32"))]
+            required_limits: wgpu::Limits::default(),
+            
             required_features: wgpu::Features::empty(),
 
             label: None,
@@ -160,18 +164,33 @@ impl<'a> AppState<'a> {
                 });
             });
 
-            let available_height = ctx.available_rect().height();
-
-            let timeline_max_ratio = 1.0 / 5.0;
-            let timeline_min_ratio = (3.0/8.0) / 5.0;
-
-            let timeline_max_height = available_height * timeline_max_ratio;
-            let timeline_min_height = available_height * timeline_min_ratio;
-
             egui::TopBottomPanel::bottom("timeline_panel")
-                .resizable(true)
-                .max_height(timeline_max_height).min_height(timeline_min_height)
+                .resizable(false)
                 .show(ctx, |ui| {
+
+                egui::SidePanel::left("time_range_panel")
+                        .resizable(false)
+                        .show_inside(ui, |ui| {
+                        ui.heading("Time range");
+                        let mut start: f32 = *self.timeline_range.start();
+                        let mut end: f32 = *self.timeline_range.end();
+                        egui::Grid::new("time_settings").show(ui, |ui| {
+                            ui.label("Start:");
+                            ui.add(egui::DragValue::new(&mut start).range(0.0..=end-(1.0/120.0)).clamp_existing_to_range(true).speed(0.01).max_decimals(2));
+                            
+                            ui.end_row();
+
+                            ui.label("End:");
+                            ui.add(egui::DragValue::new(&mut end).range(start+(1.0/120.0)..=f32::INFINITY).clamp_existing_to_range(true).speed(0.01).max_decimals(2));
+                        
+                            ui.end_row();
+
+                            ui.label("Position:");
+                            ui.add(egui::DragValue::new(&mut self.timeline_pos).range(start..=end).clamp_existing_to_range(true).speed(0.01).max_decimals(2));
+                        });
+                        self.timeline_range = start..=end;
+                    });
+
                 let (rect, response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
 
                 let slider_left = rect.left() + rect.width()*0.05;
@@ -200,12 +219,15 @@ impl<'a> AppState<'a> {
 
                 painter.line_segment([egui::pos2(slider_left, slider_cy), egui::pos2(slider_right, slider_cy)], egui::Stroke::new(1.0, egui::Color32::GRAY));
 
-                let tick_count = ((self.timeline_range.end() - self.timeline_range.start()) * 4.0).floor() as usize;
+                let tick_count = ((self.timeline_range.end()) * 4.0).floor() as usize;
 
                 for i in 0..=tick_count {
-                    let v = self.timeline_range.start() + (i as f32 * 0.25);
+                    let v = i as f32 * 0.25;
 
                     let tick_pos = egui::remap(v, self.timeline_range.clone(), slider_left..=slider_right);
+                    
+                    if tick_pos < slider_left { continue; }
+
                     let h = if i % 4 == 0 { tick_major_height } else { tick_minor_height } / 2.0;
 
                     if i % 4 == 0 {
@@ -214,6 +236,8 @@ impl<'a> AppState<'a> {
 
                     painter.line_segment([egui::pos2(tick_pos, slider_cy+h), egui::pos2(tick_pos, slider_cy-h)], egui::Stroke::new(1.0, egui::Color32::GRAY));
                 }
+
+                self.timeline_pos = self.timeline_pos.clamp(*self.timeline_range.start(), *self.timeline_range.end());
 
                 let playhead_pos = egui::remap(self.timeline_pos, self.timeline_range.clone(), slider_left..=slider_right);
 
@@ -229,6 +253,7 @@ impl<'a> AppState<'a> {
 
                 egui::SidePanel::right("preview_panel")
                     .exact_width(preview_width)
+                    .resizable(false)
                     .show_inside(ui, |ui| {
                     self.sim_renderer.render(&self.sim_render_state, ui);
                 });
