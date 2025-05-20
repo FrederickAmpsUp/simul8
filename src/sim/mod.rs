@@ -83,7 +83,7 @@ impl SimulationInterface {
 
         let mut tx = self.manager_tx.clone();
 
-        crate::util::spawn(async move { let _ = tx.send(request).await; () });
+        crate::util::spawn(async move { let _ = tx.send(request).await; log::info!("Requested!"); () });
     }
 
     pub fn process_requests(&mut self) {
@@ -96,7 +96,7 @@ impl SimulationInterface {
                     #[allow(unreachable_patterns)]
                     _ => log::warn!("Unhandled response!")
                 }
-            }
+            } else { break; }
         }
     }
 

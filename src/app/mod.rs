@@ -148,7 +148,11 @@ impl<'a> AppState<'a> {
     pub fn build_ui(&mut self, egui_input: egui::RawInput) -> egui::FullOutput {
         let preview_aspect = 9.0 / 16.0;
 
+        self.sim_interface.process_requests();
+
         let sim_frame_idx = (self.timeline_pos * 60.0).floor() as u32;
+        log::info!("{}", sim_frame_idx);
+
         let mut render_state = self.sim_interface.try_get_frame(sim_frame_idx).cloned();
         
         let res = self.egui_state.egui_ctx().run(egui_input, |ctx| {
