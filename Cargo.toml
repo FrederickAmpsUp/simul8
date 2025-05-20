@@ -10,12 +10,12 @@ egui-wgpu = "0.31.1"
 egui = "0.31.1"
 env_logger = "0.11.8"
 log = "0.4.27"
-pollster = "0.4.0"
 wgpu = "24.0.0"
 winit = "0.30"
 glam = "0.30.3"
 futures = "0.3.31"
 dyn-clone = "1.0.19"
+instant = { version = "0.1.13", features = ["wasm-bindgen"] }
 
 [dependencies.egui-winit]
 version = "0.31.1"
@@ -32,6 +32,7 @@ web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dialog = "0.3.0"
+smol = "2.0.2"
 
 [profile.release]
 strip = true

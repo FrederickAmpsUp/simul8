@@ -15,10 +15,8 @@ pub fn show_error_dialog(message: &str) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn spawn<F>(fut: F) where F: futures::Future<Output = ()> + Send + 'static{
-    std::thread::spawn(move || {
-        pollster::block_on(fut);
-    });
+pub fn spawn<F>(fut: F) where F: futures::Future<Output: Send> + Send + 'static{
+    smol::spawn(fut).detach();
 }
 
 #[cfg(target_arch = "wasm32")]

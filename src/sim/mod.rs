@@ -38,18 +38,22 @@ pub struct SimulationState {
 
 pub enum SimulationCommand {
     RequestFrame(u32),
-    StoreFrame(u32, SimulationState)
+    StoreFrame(u32, SimulationState),
+    GetCached,
+    ClearCache
 }
 
 pub enum SimulationResponse {
-    Frame(u32, SimulationState)
+    Frame(u32, SimulationState),
+    Cached(u32)
 }
 
 pub struct SimulationInterface {
     manager_tx: futures::channel::mpsc::Sender<SimulationCommand>,
     manager_rx: futures::channel::mpsc::Receiver<SimulationResponse>,
 
-    frame_cache: std::collections::BTreeMap<u32, SimulationState>
+    frame_cache: std::collections::BTreeMap<u32, SimulationState>,
+    manager_cached: u32
 }
 
 pub struct SimulationManager {
@@ -61,29 +65,46 @@ pub struct SimulationManager {
     interface_rx: futures::channel::mpsc::Receiver<SimulationCommand>
 }
 
+trait EasySend<T> {
+    fn ez_send(&mut self, data: T);
+}
+
+impl<T: Send + 'static> EasySend<T> for futures::channel::mpsc::Sender<T> {
+    fn ez_send(&mut self, data: T) {
+        use futures::SinkExt;
+        let mut tx = self.clone();
+
+        crate::util::spawn(async move { let _ = tx.send(data).await; () });
+    }
+}
+
 impl SimulationInterface {
     pub fn new(manager_tx: futures::channel::mpsc::Sender<SimulationCommand>, manager_rx: futures::channel::mpsc::Receiver<SimulationResponse>) -> Self {
         Self {
-            manager_tx, manager_rx, frame_cache: std::collections::BTreeMap::new()
+            manager_tx, manager_rx, frame_cache: std::collections::BTreeMap::new(),
+            manager_cached: 0
         }
     }
 
     pub fn load_frame(&mut self, frame: u32) {
-        use futures::SinkExt;
         let request = SimulationCommand::RequestFrame(frame);
 
-        let mut tx = self.manager_tx.clone();
+        self.manager_tx.ez_send(request);
+    }
 
-        crate::util::spawn(async move { let _ = tx.send(request).await; () });
+    pub fn load_cached(&mut self) {
+        self.manager_tx.ez_send(SimulationCommand::GetCached);
     }
 
     pub fn store_frame(&mut self, frame: u32, state: SimulationState) {
-        use futures::SinkExt;
         let request = SimulationCommand::StoreFrame(frame, state);
+        
+        self.manager_tx.ez_send(request);
+    }
 
-        let mut tx = self.manager_tx.clone();
-
-        crate::util::spawn(async move { let _ = tx.send(request).await; log::info!("Requested!"); () });
+    pub fn clear_frame_cache(&mut self) {
+        self.manager_tx.ez_send(SimulationCommand::ClearCache);
+        self.frame_cache = std::collections::BTreeMap::new();
     }
 
     pub fn process_requests(&mut self) {
@@ -92,6 +113,10 @@ impl SimulationInterface {
                 match res {
                     SimulationResponse::Frame(idx, frame) => {
                         let _ = self.frame_cache.insert(idx, frame);
+                    },
+                    SimulationResponse::Cached(count) => {
+                        self.manager_cached = count;
+                        self.frame_cache.split_off(&(count + 1));
                     },
                     #[allow(unreachable_patterns)]
                     _ => log::warn!("Unhandled response!")
@@ -102,6 +127,10 @@ impl SimulationInterface {
 
     pub fn try_get_frame(&mut self, frame: u32) -> Option<&SimulationState> {
         self.frame_cache.get(&frame)
+    }
+
+    pub fn get_cached(&mut self) -> u32 {
+        self.manager_cached
     }
 }
 
@@ -145,19 +174,23 @@ impl SimulationManager {
             if let Ok(Some(cmd)) = self.interface_rx.try_next() {
                 match cmd {
                     SimulationCommand::RequestFrame(frame_idx) => {
-                        use futures::SinkExt;
-
                         let frame = self.get_frame(frame_idx).clone();
 
-                        let mut tx = self.interface_tx.clone();
                         let res = SimulationResponse::Frame(frame_idx, frame);
-
-                        crate::util::spawn(async move { let _ = tx.send(res).await; () });
+                        
+                        self.interface_tx.ez_send(res);
                     },
                     SimulationCommand::StoreFrame(frame_idx, state) => {
                         let frame = self.get_frame_mut(frame_idx);
                         *frame = state;
-                        log::info!("Stored frame {}", frame_idx);
+                    },
+                    SimulationCommand::ClearCache => {
+                        self.frame_cache = vec![]
+                    },
+                    SimulationCommand::GetCached => {
+                        let res = SimulationResponse::Cached(self.frame_cache.len() as u32);
+
+                        self.interface_tx.ez_send(res);
                     }
                     #[allow(unreachable_patterns)]
                     _ => log::warn!("Unhandled simulation command !")
@@ -222,7 +255,6 @@ impl SimulationState {
     fn step(&mut self, dt: f32) {
         self.update_triggers();
         self.solve_pbd(dt);
-        log::info!("Step!");
     }
 
     pub fn single_step(&mut self, dt: f32) {

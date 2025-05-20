@@ -19,7 +19,10 @@ pub struct AppState<'a> {
     sim_manager: Option<crate::sim::SimulationManager>,
 
     sim_renderer: Box<dyn crate::sim::rendering::SimRenderer>,
+    sim_render_state: crate::sim::SimulationState,
     sim_interface: crate::sim::SimulationInterface,
+
+    playing: bool,
 
     window: &'a winit::window::Window
 }
@@ -108,9 +111,14 @@ impl<'a> AppState<'a> {
         let (sim_interface_tx, sim_interface_rx) = futures::channel::mpsc::channel(16);
 
         let sim_manager = crate::sim::SimulationManager::new(sim_manager_tx, sim_interface_rx);
-        let sim_interface = crate::sim::SimulationInterface::new(sim_interface_tx, sim_manager_rx);
+        let mut sim_interface = crate::sim::SimulationInterface::new(sim_interface_tx, sim_manager_rx);
 
         let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
+
+        let mut initial_state = crate::sim::SimulationState::new();
+        initial_state.gravity_accel = glam::vec2(0.0, 0.05);
+
+        sim_interface.store_frame(0, initial_state.clone());
 
         Ok(Self {
             window_surface,
@@ -128,6 +136,9 @@ impl<'a> AppState<'a> {
             sim_manager: Some(sim_manager),
             sim_interface,
             sim_renderer,
+            sim_render_state: initial_state,
+
+            playing: false,
 
             window
         })
@@ -145,33 +156,33 @@ impl<'a> AppState<'a> {
         self.needs_reconfigure = true;
     }
 
+    fn play_pause_button(ui: &mut egui::Ui, playing: &mut bool) {
+        let label = if *playing { "⏸ Pause" } else { "▶ Play" };
+        if ui.add(egui::Button::new(label)).clicked() {
+            *playing = !*playing;
+        }
+    }
+
     pub fn build_ui(&mut self, egui_input: egui::RawInput) -> egui::FullOutput {
         let preview_aspect = 9.0 / 16.0;
 
         self.sim_interface.process_requests();
 
-        let sim_frame_idx = (self.timeline_pos * 60.0).floor() as u32;
-        log::info!("{}", sim_frame_idx);
+        let mut sim_frame_idx = (self.timeline_pos * 60.0).floor() as u32;
 
-        let mut render_state = self.sim_interface.try_get_frame(sim_frame_idx).cloned();
+        if let Some(state) = self.sim_interface.try_get_frame(sim_frame_idx).cloned() {
+            self.sim_render_state = state;
+        }
+
+        let frames_cached = self.sim_interface.get_cached();
         
-        let res = self.egui_state.egui_ctx().run(egui_input, |ctx| {
+        self.egui_state.egui_ctx().run(egui_input, |ctx| {
             egui::SidePanel::left("tools_panel").resizable(true).show(ctx, |ui| {
                 ui.heading("Tools");
 
                 ui.horizontal_wrapped(|ui| {
                     ui.label("Lorem ipsum dolor sit amet");
                 });
-
-                if ui.button("Add particle").clicked() {
-                    if let Some(state) = &mut render_state {
-                        log::info!("Pressed!");
-                        state.add_particle(crate::sim::Particle::new(
-                            glam::Vec2::ZERO, 0.05, egui::Color32::RED
-                        ));
-                        self.sim_interface.store_frame(sim_frame_idx, state.clone());
-                    }
-                }
             });
 
             egui::TopBottomPanel::bottom("timeline_panel")
@@ -201,6 +212,16 @@ impl<'a> AppState<'a> {
                         self.timeline_range = start..=end;
                     });
 
+                    egui::SidePanel::left("controls_panel")
+                        .resizable(false)
+                        .show_inside(ui, |ui| {
+                        Self::play_pause_button(ui, &mut self.playing);
+                        if ui.button("⟲ Clear simulation cache").clicked() {
+                            self.sim_interface.clear_frame_cache();
+                            sim_frame_idx = 0;
+                        }
+                    });
+
                 let (rect, response) = ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
 
                 let slider_left = rect.left() + rect.width()*0.05;
@@ -227,7 +248,10 @@ impl<'a> AppState<'a> {
                     }
                 }
 
+                let cached_pos = egui::remap_clamp(frames_cached as f32 / 60.0, self.timeline_range.clone(), slider_left..=slider_right);
+
                 painter.line_segment([egui::pos2(slider_left, slider_cy), egui::pos2(slider_right, slider_cy)], egui::Stroke::new(1.0, egui::Color32::GRAY));
+                painter.line_segment([egui::pos2(slider_left, slider_cy+1.0), egui::pos2(cached_pos, slider_cy+1.0)], egui::Stroke::new(1.0, egui::Color32::YELLOW));
 
                 let tick_count = ((self.timeline_range.end()) * 4.0).floor() as usize;
 
@@ -265,21 +289,14 @@ impl<'a> AppState<'a> {
                     .exact_width(preview_width)
                     .resizable(false)
                     .show_inside(ui, |ui| {
-                    if let Some(state) = render_state.clone() {
-                        self.sim_renderer.render(&state, ui);
-                    }
+                    self.sim_renderer.render(&self.sim_render_state, ui);
                 });
 
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.heading("Other Stuff...");
                 });
             });
-        });
-
-        let sim_frame_idx = (self.timeline_pos * 60.0).floor() as u32;
-        self.sim_interface.load_frame(sim_frame_idx);
-
-        res
+        })
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -389,6 +406,8 @@ impl<'a> AppState<'a> {
             }
         });
 
+        let mut last_frame_time = instant::Instant::now();
+
         #[allow(deprecated)]
         event_loop.run(move |event, control_flow| {
             match event {
@@ -421,6 +440,19 @@ impl<'a> AppState<'a> {
                                 _ => {}
                             }
                             self.window().request_redraw();
+                            let now = instant::Instant::now();
+                            let dt = now.duration_since(last_frame_time);
+                            last_frame_time = now;
+
+                            if self.playing {
+                                self.timeline_pos += dt.as_secs_f32();
+                            }
+
+
+                            let sim_frame_idx = (self.timeline_pos * 60.0).floor() as u32;
+                            self.sim_interface.load_frame(sim_frame_idx);
+
+                            self.sim_interface.load_cached(); // can probably improve this
                         },
 
                         WindowEvent::Resized(new_size) => self.resize(*new_size),
@@ -428,7 +460,8 @@ impl<'a> AppState<'a> {
                     }
                 },
                 _ => {}
-            }})?;
+            }
+        })?;
 
         exit_status
     }
