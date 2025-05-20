@@ -60,3 +60,4 @@ impl<T> OverwriteSlot<T> {
         slot.take() // consume
     }
 }
+

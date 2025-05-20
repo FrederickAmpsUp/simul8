@@ -176,17 +176,17 @@ impl<'a> AppState<'a> {
                         let mut end: f32 = *self.timeline_range.end();
                         egui::Grid::new("time_settings").show(ui, |ui| {
                             ui.label("Start:");
-                            ui.add(egui::DragValue::new(&mut start).range(0.0..=end-(1.0/120.0)).clamp_existing_to_range(true).speed(0.01).max_decimals(2));
+                            ui.add(egui::DragValue::new(&mut start).range(0.0..=end-(1.0/120.0)).clamp_existing_to_range(true).speed(0.01).max_decimals(2).suffix("s"));
                             
                             ui.end_row();
 
                             ui.label("End:");
-                            ui.add(egui::DragValue::new(&mut end).range(start+(1.0/120.0)..=f32::INFINITY).clamp_existing_to_range(true).speed(0.01).max_decimals(2));
+                            ui.add(egui::DragValue::new(&mut end).range(start+(1.0/120.0)..=f32::INFINITY).clamp_existing_to_range(true).speed(0.01).max_decimals(2).suffix("s"));
                         
                             ui.end_row();
 
                             ui.label("Position:");
-                            ui.add(egui::DragValue::new(&mut self.timeline_pos).range(start..=end).clamp_existing_to_range(true).speed(0.01).max_decimals(2));
+                            ui.add(egui::DragValue::new(&mut self.timeline_pos).range(start..=end).clamp_existing_to_range(true).speed(0.01).max_decimals(2).suffix("s"));
                         });
                         self.timeline_range = start..=end;
                     });

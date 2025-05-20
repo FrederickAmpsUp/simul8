@@ -1,11 +1,14 @@
-pub trait SimEvent: Send {
+pub trait SimEvent: Send + dyn_clone::DynClone {
     fn trigger(&self, sim: &mut super::SimulationState);
 }
+dyn_clone::clone_trait_object!(SimEvent);
 
-pub trait SimTrigger: Send {
+pub trait SimTrigger: Send + dyn_clone::DynClone {
     fn is_triggered(&self, sim: &super::SimulationState) -> bool;
 }
+dyn_clone::clone_trait_object!(SimTrigger);
 
+#[derive(Clone)]
 pub struct TriggerManager {
     trigger: Box<dyn SimTrigger>,
     events: Vec<Box<dyn SimEvent>>
@@ -28,6 +31,7 @@ impl TriggerManager {
 }
 
 // will make this configurable in the future
+#[derive(Clone)]
 pub struct SpawnEvent;
 
 impl SimEvent for SpawnEvent {
@@ -40,6 +44,7 @@ impl SimEvent for SpawnEvent {
     }
 }
 
+#[derive(Clone)]
 pub struct AnyLeftCircleTrigger {
     radius: f32
 }
