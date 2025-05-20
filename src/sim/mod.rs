@@ -37,24 +37,76 @@ pub struct SimulationState {
 }
 
 pub enum SimulationCommand {
+    RequestFrame(u32),
+    StoreFrame(u32, SimulationState)
+}
 
+pub enum SimulationResponse {
+    Frame(u32, SimulationState)
 }
 
 pub struct SimulationInterface {
     manager_tx: futures::channel::mpsc::Sender<SimulationCommand>,
-    manager_rx: futures::channel::mpsc::Receiver<SimulationCommand>
+    manager_rx: futures::channel::mpsc::Receiver<SimulationResponse>,
+
+    frame_cache: std::collections::BTreeMap<u32, SimulationState>
 }
+
 pub struct SimulationManager {
     frame_cache: Vec<SimulationState>,
 
     fps: f32,
 
-    interface_tx: futures::channel::mpsc::Sender<SimulationCommand>,
+    interface_tx: futures::channel::mpsc::Sender<SimulationResponse>,
     interface_rx: futures::channel::mpsc::Receiver<SimulationCommand>
 }
 
+impl SimulationInterface {
+    pub fn new(manager_tx: futures::channel::mpsc::Sender<SimulationCommand>, manager_rx: futures::channel::mpsc::Receiver<SimulationResponse>) -> Self {
+        Self {
+            manager_tx, manager_rx, frame_cache: std::collections::BTreeMap::new()
+        }
+    }
+
+    pub fn load_frame(&mut self, frame: u32) {
+        use futures::SinkExt;
+        let request = SimulationCommand::RequestFrame(frame);
+
+        let mut tx = self.manager_tx.clone();
+
+        crate::util::spawn(async move { let _ = tx.send(request).await; () });
+    }
+
+    pub fn store_frame(&mut self, frame: u32, state: SimulationState) {
+        use futures::SinkExt;
+        let request = SimulationCommand::StoreFrame(frame, state);
+
+        let mut tx = self.manager_tx.clone();
+
+        crate::util::spawn(async move { let _ = tx.send(request).await; () });
+    }
+
+    pub fn process_requests(&mut self) {
+        loop {
+            if let Ok(Some(res)) = self.manager_rx.try_next() {
+                match res {
+                    SimulationResponse::Frame(idx, frame) => {
+                        let _ = self.frame_cache.insert(idx, frame);
+                    },
+                    #[allow(unreachable_patterns)]
+                    _ => log::warn!("Unhandled response!")
+                }
+            }
+        }
+    }
+
+    pub fn try_get_frame(&mut self, frame: u32) -> Option<&SimulationState> {
+        self.frame_cache.get(&frame)
+    }
+}
+
 impl SimulationManager {
-    fn new(interface_tx: futures::channel::mpsc::Sender<SimulationCommand>, interface_rx: futures::channel::mpsc::Receiver<SimulationCommand>) -> Self {
+    pub fn new(interface_tx: futures::channel::mpsc::Sender<SimulationResponse>, interface_rx: futures::channel::mpsc::Receiver<SimulationCommand>) -> Self {
         Self {
             frame_cache: vec![],
             fps: 60.0,
@@ -62,7 +114,7 @@ impl SimulationManager {
         }
     }
 
-    fn run_frame(&mut self) {
+    pub fn run_frame(&mut self) {
         let mut last_frame = (self.frame_cache.last()).unwrap_or(&SimulationState::new()).clone();
 
         last_frame.single_step(1.0 / self.fps);
@@ -70,22 +122,50 @@ impl SimulationManager {
         self.frame_cache.push(last_frame);
     }
 
-    fn get_frame(&mut self, frame: usize) -> &SimulationState {
-        while self.frame_cache.len() <= frame {
+    pub fn get_frame(&mut self, frame: u32) -> &SimulationState {
+        while self.frame_cache.len() as u32 <= frame {
             self.run_frame();
         }
 
-        &self.frame_cache[frame]
+        &self.frame_cache[frame as usize]
     }
 
-    fn get_frame_mut(&mut self, frame: usize) -> &mut SimulationState {
-        self.frame_cache.truncate(frame+1);
+    pub fn get_frame_mut(&mut self, frame: u32) -> &mut SimulationState {
+        self.frame_cache.truncate(frame as usize + 1);
 
-        while self.frame_cache.len() <= frame {
+        while self.frame_cache.len() as u32 <= frame {
             self.run_frame();
         }
 
-        &mut self.frame_cache[frame]
+        &mut self.frame_cache[frame as usize]
+    }
+
+    pub fn process_requests(&mut self) {
+        loop {
+            if let Ok(Some(cmd)) = self.interface_rx.try_next() {
+                match cmd {
+                    SimulationCommand::RequestFrame(frame_idx) => {
+                        use futures::SinkExt;
+
+                        let frame = self.get_frame(frame_idx).clone();
+
+                        let mut tx = self.interface_tx.clone();
+                        let res = SimulationResponse::Frame(frame_idx, frame);
+
+                        crate::util::spawn(async move { let _ = tx.send(res).await; () });
+                    },
+                    SimulationCommand::StoreFrame(frame_idx, state) => {
+                        let frame = self.get_frame_mut(frame_idx);
+                        *frame = state;
+                        log::info!("Stored frame {}", frame_idx);
+                    }
+                    #[allow(unreachable_patterns)]
+                    _ => log::warn!("Unhandled simulation command !")
+                }
+            } else {
+                break;
+            }
+        }
     }
 }
 
@@ -142,6 +222,7 @@ impl SimulationState {
     fn step(&mut self, dt: f32) {
         self.update_triggers();
         self.solve_pbd(dt);
+        log::info!("Step!");
     }
 
     pub fn single_step(&mut self, dt: f32) {

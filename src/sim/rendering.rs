@@ -10,7 +10,7 @@ impl Viewport {
 }
 
 pub trait SimRenderer {
-    fn render(&self, sim: &super::SimulationRenderState, ui: &mut egui::Ui);
+    fn render(&self, sim: &super::SimulationState, ui: &mut egui::Ui);
 
     fn line_segment(&self, a: glam::Vec2, b: glam::Vec2, thickness: f32, color: egui::Color32, ui: &mut egui::Ui, render_state: &RenderState);
     fn circle(&self, center: glam::Vec2, radius: f32, thickness: f32, color: egui::Color32, ui: &mut egui::Ui, render_state: &RenderState);
@@ -35,7 +35,7 @@ impl CpuSimRenderer {
 }
 
 impl SimRenderer for CpuSimRenderer {
-    fn render(&self, sim: &super::SimulationRenderState, ui: &mut egui::Ui) {
+    fn render(&self, sim: &super::SimulationState, ui: &mut egui::Ui) {
         let vw = ui.available_width();
         let vh = ui.available_height();
 

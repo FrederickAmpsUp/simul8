@@ -1,5 +1,4 @@
 use winit::event::{Event, WindowEvent};
-use anyhow::Context;
 
 #[allow(dead_code)]
 pub struct AppState<'a> {
@@ -17,11 +16,10 @@ pub struct AppState<'a> {
     timeline_pos: f32,
     timeline_range: std::ops::RangeInclusive<f32>,
 
-    pub sim_state: Option<crate::sim::SimulationState>,
+    sim_manager: Option<crate::sim::SimulationManager>,
 
-    sim_render_rx: crate::util::OverwriteSlot<crate::sim::SimulationRenderState>,
-    sim_render_state: crate::sim::SimulationRenderState,
     sim_renderer: Box<dyn crate::sim::rendering::SimRenderer>,
+    sim_interface: crate::sim::SimulationInterface,
 
     window: &'a winit::window::Window
 }
@@ -106,10 +104,11 @@ impl<'a> AppState<'a> {
 
         log::info!(" - Created EGUI objects.");
 
-        let (sim_render_tx, sim_render_rx) = crate::util::OverwriteSlot::new();
+        let (sim_manager_tx, sim_manager_rx) = futures::channel::mpsc::channel(16);
+        let (sim_interface_tx, sim_interface_rx) = futures::channel::mpsc::channel(16);
 
-        let mut sim_state = crate::sim::SimulationState::new(Some(sim_render_tx));
-        sim_state.gravity_accel = glam::vec2(0.0, 0.5);
+        let sim_manager = crate::sim::SimulationManager::new(sim_manager_tx, sim_interface_rx);
+        let sim_interface = crate::sim::SimulationInterface::new(sim_interface_tx, sim_manager_rx);
 
         let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
 
@@ -126,9 +125,9 @@ impl<'a> AppState<'a> {
             timeline_pos: 0.0,
             timeline_range: 0.0..=3.5,
 
-            sim_render_state: sim_state.get_render_state(),
-            sim_render_rx,
-            sim_state: Some(sim_state), sim_renderer,
+            sim_manager: Some(sim_manager),
+            sim_interface,
+            sim_renderer,
 
             window
         })
@@ -146,22 +145,29 @@ impl<'a> AppState<'a> {
         self.needs_reconfigure = true;
     }
 
-    pub fn update_sim_render_state(&mut self) {
-        if let Some(sim_render_state) = self.sim_render_rx.try_read() {
-            self.sim_render_state = sim_render_state;
-        }
-    }
-
     pub fn build_ui(&mut self, egui_input: egui::RawInput) -> egui::FullOutput {
         let preview_aspect = 9.0 / 16.0;
 
-        self.egui_state.egui_ctx().run(egui_input, |ctx| {
+        let sim_frame_idx = (self.timeline_pos * 60.0).floor() as u32;
+        let mut render_state = self.sim_interface.try_get_frame(sim_frame_idx).cloned();
+        
+        let res = self.egui_state.egui_ctx().run(egui_input, |ctx| {
             egui::SidePanel::left("tools_panel").resizable(true).show(ctx, |ui| {
                 ui.heading("Tools");
 
                 ui.horizontal_wrapped(|ui| {
                     ui.label("Lorem ipsum dolor sit amet");
                 });
+
+                if ui.button("Add particle").clicked() {
+                    if let Some(state) = &mut render_state {
+                        log::info!("Pressed!");
+                        state.add_particle(crate::sim::Particle::new(
+                            glam::Vec2::ZERO, 0.05, egui::Color32::RED
+                        ));
+                        self.sim_interface.store_frame(sim_frame_idx, state.clone());
+                    }
+                }
             });
 
             egui::TopBottomPanel::bottom("timeline_panel")
@@ -255,14 +261,21 @@ impl<'a> AppState<'a> {
                     .exact_width(preview_width)
                     .resizable(false)
                     .show_inside(ui, |ui| {
-                    self.sim_renderer.render(&self.sim_render_state, ui);
+                    if let Some(state) = render_state.clone() {
+                        self.sim_renderer.render(&state, ui);
+                    }
                 });
 
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.heading("Other Stuff...");
                 });
             });
-        })
+        });
+
+        let sim_frame_idx = (self.timeline_pos * 60.0).floor() as u32;
+        self.sim_interface.load_frame(sim_frame_idx);
+
+        res
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -358,24 +371,17 @@ impl<'a> AppState<'a> {
         self.window
     }
 
-    pub fn sim_state(&self) -> &crate::sim::SimulationState {
-        self.sim_state.as_ref().unwrap()
-    }
-
-    pub fn sim_state_mut(&mut self) -> &mut crate::sim::SimulationState {
-        self.sim_state.as_mut().unwrap()
-    }
-
     pub fn run(mut self, event_loop: winit::event_loop::EventLoop<()>) -> anyhow::Result<()> {
         let mut exit_status: anyhow::Result<()> = Ok(());
         let exit = &mut exit_status;
 
-        let mut sim_state = Box::new(self.sim_state.take().context("unreachable")?);
+        let mut sim_manager = self.sim_manager.take().unwrap();
+
         #[cfg(not(target_arch = "wasm32"))]
         let _ = std::thread::spawn(move || {
             loop {
-                sim_state.single_step(1.0/60.0);
-                std::thread::sleep(std::time::Duration::from_millis(16));
+                sim_manager.process_requests();
+                std::thread::sleep(std::time::Duration::from_millis(1));
             }
         });
 
@@ -395,9 +401,7 @@ impl<'a> AppState<'a> {
 
                         WindowEvent::RedrawRequested => {
                             #[cfg(target_arch = "wasm32")]
-                            sim_state.single_step(1.0/60.0);
-                            
-                            self.update_sim_render_state();
+                            sim_manager.process_requests();
                             
                             match self.render() {
                                 Ok(_) => {},
