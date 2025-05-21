@@ -21,6 +21,21 @@ jobs:
       - name: Build
         run: cargo build --release
 
+      - name: Set artifact path
+        id: artifact
+        run: |
+          case "${{ runner.os }} in
+            Windows) echo "path=target\\release\\simul8.exe" >> $GITHUB_OUTPUT ;;
+            macOS|Linux) echo "path=target/release/simul8" >> $GITHUB_OUTPUT ;;
+          esac
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simul8-${{ matrix.os }}
+          path: ${{ steps.artifact.outputs.path }}
+
   build-web:
     name: Build (web)
     runs-on: ubuntu-latest
