@@ -310,7 +310,8 @@ impl<'a> AppState<'a> {
 
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     let mut needs_update = false;
-                    
+                    egui::ScrollArea::vertical()
+                    .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.heading("Triggers");
 
@@ -433,6 +434,7 @@ impl<'a> AppState<'a> {
                         self.sim_render_state = self.sim_initial_state.clone();
                         self.sim_interface.store_frame(0, self.sim_initial_state.clone());
                     }
+                    });
                 });
             });
         })
