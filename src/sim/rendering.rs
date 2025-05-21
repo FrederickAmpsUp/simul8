@@ -58,7 +58,7 @@ impl SimRenderer for CpuSimRenderer {
         }
 
         for constraint in &sim.constraints {
-            constraint.draw(self, ui, &render_state);
+            constraint.draw_sim(self, ui, &render_state);
         }
     }
 

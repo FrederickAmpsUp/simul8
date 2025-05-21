@@ -124,6 +124,8 @@ impl<'a> AppState<'a> {
             vec![Box::new(crate::sim::event::SpawnEvent { particle: crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED) })]
         ));
 
+        sim_initial_state.add_constraint(crate::sim::constraints::CircleConstraint::new(1.0, 1.0));
+
         sim_initial_state.add_particle(crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED));
 
         sim_interface.store_frame(0, sim_initial_state.clone());
@@ -309,14 +311,24 @@ impl<'a> AppState<'a> {
 
                     let mut needs_update = false;
 
-                    for manager in &mut self.sim_initial_state.trigger_managers {
-                        let res = manager.draw(ui);
-                    
-                        if res.inner {
-                            needs_update = true;
+                    egui::ScrollArea::horizontal()
+                        .id_salt("managers-area")
+                        .show(ui, |ui| {
+                        
+                        for manager in &mut self.sim_initial_state.trigger_managers {
+                            needs_update |= manager.draw(ui).inner;
                         }
-                    }
-                   
+                    });
+
+                    egui::ScrollArea::horizontal()
+                        .id_salt("constraints-area")
+                        .show(ui, |ui| {
+
+                        for constraint in &mut self.sim_initial_state.constraints {
+                            needs_update |= constraint.draw(ui).inner;
+                        }
+                    });
+                    
                     if needs_update {
                         self.sim_render_state = self.sim_initial_state.clone();
                         self.sim_interface.store_frame(0, self.sim_initial_state.clone());

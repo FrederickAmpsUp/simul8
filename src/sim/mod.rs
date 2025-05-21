@@ -20,9 +20,9 @@ impl Particle {
     }
 }
 
-pub trait Constraint: Send + dyn_clone::DynClone {
+pub trait Constraint: Send + dyn_clone::DynClone + rendering::RenderableTool {
     fn constrain(&self, particle: &mut Particle);
-    fn draw(&self, _renderer: &dyn rendering::SimRenderer, _ui: &mut egui::Ui, _r: &rendering::RenderState) {}
+    fn draw_sim(&self, _renderer: &dyn rendering::SimRenderer, _ui: &mut egui::Ui, _r: &rendering::RenderState) {}
 }
 dyn_clone::clone_trait_object!(Constraint);
 
