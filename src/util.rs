@@ -59,3 +59,15 @@ impl<T> OverwriteSlot<T> {
     }
 }
 
+pub fn color32_to_hsva(color: egui::Color32) -> egui::epaint::Hsva {
+    let [r, g, b, a] = color.to_srgba_unmultiplied();
+    egui::epaint::Hsva::from_srgba_unmultiplied(
+        [r, g, b, a]
+    )
+}
+
+pub fn hsva_to_color32(hsva: egui::epaint::Hsva) -> egui::Color32 {
+    let [r, g, b, a] = hsva.to_srgba_unmultiplied();
+    egui::Color32::from_rgba_unmultiplied(r, g, b, a)
+}
+

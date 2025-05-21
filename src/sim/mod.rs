@@ -28,10 +28,10 @@ dyn_clone::clone_trait_object!(Constraint);
 
 #[derive(Clone)]
 pub struct SimulationState {
-    particles: Vec<Particle>,
-    constraints: Vec<Box<dyn Constraint>>,
+    pub particles: Vec<Particle>,
+    pub constraints: Vec<Box<dyn Constraint>>,
     
-    trigger_managers: Vec<event::TriggerManager>,
+    pub trigger_managers: Vec<event::TriggerManager>,
 
     pub gravity_accel: glam::Vec2,
 }

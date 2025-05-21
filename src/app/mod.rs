@@ -20,6 +20,7 @@ pub struct AppState<'a> {
 
     sim_renderer: Box<dyn crate::sim::rendering::SimRenderer>,
     sim_render_state: crate::sim::SimulationState,
+    sim_initial_state: crate::sim::SimulationState,
     sim_interface: crate::sim::SimulationInterface,
 
     playing: bool,
@@ -115,10 +116,17 @@ impl<'a> AppState<'a> {
 
         let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
 
-        let mut initial_state = crate::sim::SimulationState::new();
-        initial_state.gravity_accel = glam::vec2(0.0, 0.05);
+        let mut sim_initial_state = crate::sim::SimulationState::new();
+        sim_initial_state.gravity_accel = glam::vec2(0.0, 0.05);
 
-        sim_interface.store_frame(0, initial_state.clone());
+        sim_initial_state.add_trigger_manager(crate::sim::event::TriggerManager::new(
+            Box::new(crate::sim::event::AnyLeftCircleTrigger::new(1.0)),
+            vec![Box::new(crate::sim::event::SpawnEvent { particle: crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED) })]
+        ));
+
+        sim_initial_state.add_particle(crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED));
+
+        sim_interface.store_frame(0, sim_initial_state.clone());
 
         Ok(Self {
             window_surface,
@@ -136,7 +144,8 @@ impl<'a> AppState<'a> {
             sim_manager: Some(sim_manager),
             sim_interface,
             sim_renderer,
-            sim_render_state: initial_state,
+            sim_render_state: sim_initial_state.clone(),
+            sim_initial_state,
 
             playing: false,
 
@@ -218,6 +227,7 @@ impl<'a> AppState<'a> {
                         Self::play_pause_button(ui, &mut self.playing);
                         if ui.button("⟲ Clear simulation cache").clicked() {
                             self.sim_interface.clear_frame_cache();
+                            self.sim_interface.store_frame(0, self.sim_initial_state.clone());
                             sim_frame_idx = 0;
                         }
                     });
@@ -294,6 +304,24 @@ impl<'a> AppState<'a> {
 
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.heading("Other Stuff...");
+
+                    use crate::sim::rendering::RenderableTool;
+
+                    let mut needs_update = false;
+
+                    for manager in &mut self.sim_initial_state.trigger_managers {
+                        let res = manager.draw(ui);
+                    
+                        if res.inner {
+                            needs_update = true;
+                        }
+                    }
+                   
+                    if needs_update {
+                        self.sim_render_state = self.sim_initial_state.clone();
+                        self.sim_interface.store_frame(0, self.sim_initial_state.clone());
+                        log::info!("Updating");
+                    }
                 });
             });
         })

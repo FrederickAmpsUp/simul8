@@ -17,6 +17,10 @@ pub trait SimRenderer {
     fn circle_filled(&self, center: glam::Vec2, radius: f32, color: egui::Color32, ui: &mut egui::Ui, render_state: &RenderState);
 }
 
+pub trait RenderableTool {
+    fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool>;
+}
+
 pub struct RenderState {
     center: egui::Pos2,
     vw: f32
