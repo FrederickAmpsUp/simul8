@@ -38,9 +38,9 @@ impl rendering::RenderableTool for TriggerManager {
             .corner_radius(5.0)
             .inner_margin(10.0)
             .show(ui, |ui| {
-            
+            let mut changed = false;
+
             ui.vertical(|ui| {
-                let mut changed = false;
                 ui.label("Trigger");
                 changed |= self.trigger.draw(ui).inner;
             
@@ -49,8 +49,8 @@ impl rendering::RenderableTool for TriggerManager {
                     changed |= event.draw(ui).inner;
                 }
 
-                changed
-            }).inner
+            });
+            changed
         })
     }
 }
@@ -62,17 +62,15 @@ pub struct SpawnEvent {
 
 impl SimEvent for SpawnEvent {
     fn trigger(&self, sim: &mut super::SimulationState) {
-        sim.add_particle(super::Particle::new(
-            glam::Vec2::ZERO,
-            0.05,
-            egui::Color32::CYAN
-        ));
+        sim.add_particle(self.particle.clone());
     }
 }
 
 
 impl rendering::RenderableTool for SpawnEvent {
     fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
+        let mut changed = false;
+
         let response = egui::Frame::group(ui.style())
             .fill(egui::Color32::from_gray(30))
             .corner_radius(5.0)
@@ -87,34 +85,34 @@ impl rendering::RenderableTool for SpawnEvent {
                 let mut vy = (self.particle.position.y - self.particle.last_position.y) * 60.0;
 
                 ui.label("Position");
-                ui.add(egui::DragValue::new(&mut self.particle.position.x).prefix("X:").speed(0.01));
-                ui.add(egui::DragValue::new(&mut self.particle.position.y).prefix("Y:").speed(0.01));
+                changed |= ui.add(egui::DragValue::new(&mut self.particle.position.x).prefix("X:").speed(0.01)).changed();
+                changed |= ui.add(egui::DragValue::new(&mut self.particle.position.y).prefix("Y:").speed(0.01)).changed();
                 ui.end_row();
 
                 ui.label("Velocity");
 
-                ui.add(egui::DragValue::new(&mut vx).prefix("X:").speed(0.01));
-                ui.add(egui::DragValue::new(&mut vy).prefix("Y:").speed(0.01));
+                changed |= ui.add(egui::DragValue::new(&mut vx).prefix("X:").speed(0.01)).changed();
+                changed |= ui.add(egui::DragValue::new(&mut vy).prefix("Y:").speed(0.01)).changed();
 
                 self.particle.last_position.x = self.particle.position.x - vx/60.0;
                 self.particle.last_position.y = self.particle.position.y - vy/60.0;
                 ui.end_row();
 
                 ui.label("Radius");
-                ui.add(egui::DragValue::new(&mut self.particle.radius).speed(0.01));
+                changed |= ui.add(egui::DragValue::new(&mut self.particle.radius).speed(0.01)).changed();
                 ui.end_row();
                 
                 ui.label("Color");
 
                 let mut hsva: egui::epaint::Hsva = crate::util::color32_to_hsva(self.particle.color);
 
-                ui.color_edit_button_hsva(&mut hsva);
+                changed |= ui.color_edit_button_hsva(&mut hsva).changed();
 
                 self.particle.color = crate::util::hsva_to_color32(hsva);
             });
         }).response;
 
-        egui::InnerResponse { inner: response.changed(), response }
+        egui::InnerResponse { inner: changed, response }
     }
 }
 
@@ -143,6 +141,8 @@ impl SimTrigger for AnyLeftCircleTrigger {
 
 impl rendering::RenderableTool for AnyLeftCircleTrigger {
     fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
+        let mut changed = false;
+
         let response = egui::Frame::group(ui.style())
             .corner_radius(5.0)
             .inner_margin(10.0)
@@ -153,7 +153,7 @@ impl rendering::RenderableTool for AnyLeftCircleTrigger {
             egui::Grid::new("circle-settings")
                 .show(ui, |ui| {
                 ui.label("Radius:");
-                ui.add(egui::DragValue::new(&mut self.radius).speed(0.01));
+                changed |= ui.add(egui::DragValue::new(&mut self.radius).speed(0.01)).changed();
             });
         }).response;
 

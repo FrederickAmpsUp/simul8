@@ -98,12 +98,16 @@ impl SimulationInterface {
 
     pub fn store_frame(&mut self, frame: u32, state: SimulationState) {
         let request = SimulationCommand::StoreFrame(frame, state);
-        
+        self.frame_cache.split_off(&(frame + 1));
         self.manager_tx.ez_send(request);
     }
 
     pub fn clear_frame_cache(&mut self) {
         self.manager_tx.ez_send(SimulationCommand::ClearCache);
+        self.frame_cache = std::collections::BTreeMap::new();
+    }
+
+    pub fn clear_local_cache(&mut self) {
         self.frame_cache = std::collections::BTreeMap::new();
     }
 

@@ -117,7 +117,7 @@ impl<'a> AppState<'a> {
         let sim_renderer = Box::new(crate::sim::rendering::CpuSimRenderer::new());
 
         let mut sim_initial_state = crate::sim::SimulationState::new();
-        sim_initial_state.gravity_accel = glam::vec2(0.0, 0.05);
+        sim_initial_state.gravity_accel = glam::vec2(0.0, 0.25);
 
         sim_initial_state.add_trigger_manager(crate::sim::event::TriggerManager::new(
             Box::new(crate::sim::event::AnyLeftCircleTrigger::new(1.0)),
@@ -320,7 +320,6 @@ impl<'a> AppState<'a> {
                     if needs_update {
                         self.sim_render_state = self.sim_initial_state.clone();
                         self.sim_interface.store_frame(0, self.sim_initial_state.clone());
-                        log::info!("Updating");
                     }
                 });
             });
