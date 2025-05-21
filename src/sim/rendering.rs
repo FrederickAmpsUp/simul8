@@ -18,7 +18,7 @@ pub trait SimRenderer {
 }
 
 pub trait RenderableTool {
-    fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool>;
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool>;
 }
 
 pub struct RenderState {

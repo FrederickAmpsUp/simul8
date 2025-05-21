@@ -34,7 +34,7 @@ impl super::Constraint for CircleConstraint {
 }
 
 impl super::rendering::RenderableTool for CircleConstraint {
-    fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
         let mut changed = false;
         egui::Frame::group(ui.style())
             .corner_radius(5.0)
@@ -42,7 +42,7 @@ impl super::rendering::RenderableTool for CircleConstraint {
             .show(ui, |ui| {
             
             ui.heading("Circle constraint");
-            egui::Grid::new("circle-settings")
+            egui::Grid::new(format!("circle-settings{}", id_salt))
                 .show(ui, |ui| {
                 
                 ui.label("Radius:");
@@ -53,6 +53,7 @@ impl super::rendering::RenderableTool for CircleConstraint {
                 ui.label("Elasticity:");
                 changed |= ui.add(egui::DragValue::new(&mut self.elasticity).speed(0.01).range(0.0..=1.0)).changed();
             });
+            *id_salt += 1;
             changed
         })
     }

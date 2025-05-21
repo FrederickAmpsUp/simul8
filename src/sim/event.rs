@@ -33,7 +33,7 @@ impl TriggerManager {
 }
 
 impl rendering::RenderableTool for TriggerManager {
-    fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
         egui::Frame::group(ui.style())
             .corner_radius(5.0)
             .inner_margin(10.0)
@@ -42,11 +42,11 @@ impl rendering::RenderableTool for TriggerManager {
 
             ui.vertical(|ui| {
                 ui.label("Trigger");
-                changed |= self.trigger.draw(ui).inner;
+                changed |= self.trigger.draw(ui, id_salt).inner;
             
                 ui.label("Events");
                 for event in &mut self.events {
-                    changed |= event.draw(ui).inner;
+                    changed |= event.draw(ui, id_salt).inner;
                 }
 
             });
@@ -68,7 +68,7 @@ impl SimEvent for SpawnEvent {
 
 
 impl rendering::RenderableTool for SpawnEvent {
-    fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
         let mut changed = false;
 
         egui::Frame::group(ui.style())
@@ -78,7 +78,7 @@ impl rendering::RenderableTool for SpawnEvent {
             .show(ui, |ui| {
             
             ui.heading("Spawn Particle");
-            egui::Grid::new("particle-settings")
+            egui::Grid::new(format!("particle-settings{}", id_salt))
                 .show(ui, |ui| {
 
                 let mut vx = (self.particle.position.x - self.particle.last_position.x) * 60.0;
@@ -110,6 +110,7 @@ impl rendering::RenderableTool for SpawnEvent {
 
                 self.particle.color = crate::util::hsva_to_color32(hsva);
             });
+            *id_salt += 1;
             changed
         })
 
@@ -140,7 +141,7 @@ impl SimTrigger for AnyLeftCircleTrigger {
 }
 
 impl rendering::RenderableTool for AnyLeftCircleTrigger {
-    fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
         let mut changed = false;
 
         egui::Frame::group(ui.style())
@@ -150,11 +151,12 @@ impl rendering::RenderableTool for AnyLeftCircleTrigger {
             
             ui.heading("Any particle left circular bound");
             
-            egui::Grid::new("circle-settings")
+            egui::Grid::new(format!("circle-settings{}", id_salt))
                 .show(ui, |ui| {
                 ui.label("Radius:");
                 changed |= ui.add(egui::DragValue::new(&mut self.radius).speed(0.01)).changed();
             });
+            *id_salt += 1;
             changed
         })
 

@@ -25,6 +25,9 @@ pub struct AppState<'a> {
 
     playing: bool,
 
+    selected_trigger: String,
+    new_trigger: Option<crate::sim::event::TriggerManager>,
+
     window: &'a winit::window::Window
 }
 
@@ -151,6 +154,9 @@ impl<'a> AppState<'a> {
 
             playing: false,
 
+            selected_trigger: String::new(),
+            new_trigger: None,
+
             window
         })
     }
@@ -188,14 +194,6 @@ impl<'a> AppState<'a> {
         let frames_cached = self.sim_interface.get_cached();
         
         self.egui_state.egui_ctx().run(egui_input, |ctx| {
-            egui::SidePanel::left("tools_panel").resizable(true).show(ctx, |ui| {
-                ui.heading("Tools");
-
-                ui.horizontal_wrapped(|ui| {
-                    ui.label("Lorem ipsum dolor sit amet");
-                });
-            });
-
             egui::TopBottomPanel::bottom("timeline_panel")
                 .resizable(false)
                 .show(ctx, |ui| {
@@ -305,27 +303,54 @@ impl<'a> AppState<'a> {
                 });
 
                 egui::CentralPanel::default().show_inside(ui, |ui| {
-                    ui.heading("Other Stuff...");
+                    
+                    ui.horizontal(|ui| {
+                        ui.heading("Triggers");
+
+                        ui.separator();
+
+                        egui::ComboBox::new("trigger-selector", "")
+                            .selected_text(self.selected_trigger.clone())
+                            .show_ui(ui, |ui| {
+                            
+                            if ui.selectable_value(&mut self.selected_trigger, "AnyLeftCricleTrigger".into(), "Any particle left circle").clicked() {
+                                self.new_trigger = Some(crate::sim::event::TriggerManager::new(
+                                    Box::new(crate::sim::event::AnyLeftCircleTrigger::new(1.0)), vec![]
+                                ));
+                            }
+                        });
+
+                        if ui.button("+ Add").clicked() {
+                            if let Some(t) = &self.new_trigger {
+                                self.sim_initial_state.add_trigger_manager(t.clone());
+                            }
+                        }
+                    });
 
                     use crate::sim::rendering::RenderableTool;
 
                     let mut needs_update = false;
 
+                    let mut i = 0u32; 
+
                     egui::ScrollArea::horizontal()
                         .id_salt("managers-area")
                         .show(ui, |ui| {
-                        
-                        for manager in &mut self.sim_initial_state.trigger_managers {
-                            needs_update |= manager.draw(ui).inner;
-                        }
+                        ui.horizontal(|ui| {
+                            for manager in &mut self.sim_initial_state.trigger_managers {
+                                needs_update |= manager.draw(ui, &mut i).inner;
+                            }
+                        });
                     });
+
+                    ui.heading("Constraints");
 
                     egui::ScrollArea::horizontal()
                         .id_salt("constraints-area")
                         .show(ui, |ui| {
-
+                        
                         for constraint in &mut self.sim_initial_state.constraints {
-                            needs_update |= constraint.draw(ui).inner;
+                            needs_update |= constraint.draw(ui, &mut i).inner;
                         }
                     });
                     
