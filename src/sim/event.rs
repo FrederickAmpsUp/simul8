@@ -65,6 +65,7 @@ impl rendering::RenderableTool for TriggerManager {
                 }
                 if let Some(r) = remove {
                     self.events.remove(r);
+                    changed = true;
                 }
             });
             (changed, remove)
@@ -87,6 +88,7 @@ impl SimEvent for SpawnEvent {
 impl rendering::RenderableTool for SpawnEvent {
     fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<(bool, bool)> {
         let mut changed = false;
+        let mut remove = false;
 
         egui::Frame::group(ui.style())
             .fill(egui::Color32::from_gray(30))
@@ -94,7 +96,12 @@ impl rendering::RenderableTool for SpawnEvent {
             .inner_margin(10.0)
             .show(ui, |ui| {
             
-            ui.heading("Spawn Particle");
+            ui.horizontal(|ui| {
+                ui.heading("Spawn Particle");
+
+                remove = ui.button("X").on_hover_text("Remove").clicked();
+            });
+
             egui::Grid::new(format!("particle-settings{}", id_salt))
                 .show(ui, |ui| {
 
@@ -128,7 +135,7 @@ impl rendering::RenderableTool for SpawnEvent {
                 self.particle.color = crate::util::hsva_to_color32(hsva);
             });
             *id_salt += 1;
-            (changed, false)
+            (changed, remove)
         })
 
     }

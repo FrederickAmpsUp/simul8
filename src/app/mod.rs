@@ -341,8 +341,22 @@ impl<'a> AppState<'a> {
                                 egui::Vec2::new(f32::INFINITY, 0.0),
                                 egui::Layout::left_to_right(egui::Align::Min),
                                 |ui| {
+                            let mut remove = None;
+                            let mut i = 0usize;
+
                             for manager in &mut self.sim_initial_state.trigger_managers {
-                                needs_update |= manager.draw(ui, &mut id_salt).inner.0;
+                                let res = manager.draw(ui, &mut id_salt).inner;
+
+                                needs_update |= res.0;
+
+                                if res.1 {
+                                    remove = Some(i);
+                                }
+                                i += 1;
+                            }
+                            if let Some(r) = remove {
+                                needs_update = true;
+                                self.sim_initial_state.trigger_managers.remove(r);
                             }
                         });
                     });
@@ -354,9 +368,24 @@ impl<'a> AppState<'a> {
                     egui::ScrollArea::horizontal()
                         .id_salt("constraints-area")
                         .show(ui, |ui| {
-                        
+                       
+                        let mut remove = None;
+                        let mut i = 0usize;
+
                         for constraint in &mut self.sim_initial_state.constraints {
-                            needs_update |= constraint.draw(ui, &mut id_salt).inner.0;
+                            let res = constraint.draw(ui, &mut id_salt).inner;
+
+                            needs_update |= res.0;
+
+                            if res.1 {
+                                remove = Some(i);
+                            }
+                            i += 1;
+                        }
+
+                        if let Some(r) = remove {
+                            self.sim_initial_state.constraints.remove(r);
+                            needs_update = true;
                         }
                     });
 

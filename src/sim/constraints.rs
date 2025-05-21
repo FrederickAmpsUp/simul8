@@ -42,9 +42,11 @@ impl super::rendering::RenderableTool for CircleConstraint {
             .inner_margin(10.0)
             .show(ui, |ui| {
             
-            ui.heading("Circle constraint");
+            ui.horizontal(|ui| {
+                ui.heading("Circle");
 
-            remove = ui.button("X").on_hover_text("Remove").clicked();
+                remove = ui.button("X").on_hover_text("Remove").clicked();
+            });
 
             egui::Grid::new(format!("circle-settings{}", id_salt))
                 .show(ui, |ui| {
