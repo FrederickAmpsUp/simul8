@@ -60,6 +60,7 @@ pub struct SimulationInterface {
 
 pub struct SimulationManager {
     frame_cache: Vec<SimulationState>,
+    requested_frame: Option<u32>,
 
     fps: f32,
 
@@ -141,6 +142,7 @@ impl SimulationManager {
     pub fn new(interface_tx: flume::Sender<SimulationResponse>, interface_rx: flume::Receiver<SimulationCommand>) -> Self {
         Self {
             frame_cache: vec![],
+            requested_frame: None,
             fps: 60.0,
             interface_tx, interface_rx
         }
@@ -177,11 +179,16 @@ impl SimulationManager {
             if let Ok(cmd) = self.interface_rx.try_recv() {
                 match cmd {
                     SimulationCommand::RequestFrame(frame_idx) => {
+                        self.requested_frame = Some(frame_idx);
+
+                        #[cfg(target_arch = "wasm32")]
+                        {
                         let frame = self.get_frame(frame_idx).clone();
 
                         let res = SimulationResponse::Frame(frame_idx, frame);
                         
                         self.interface_tx.ez_send(res);
+                        }
                     },
                     SimulationCommand::StoreFrame(frame_idx, state) => {
                         let frame = self.get_frame_mut(frame_idx);
@@ -200,6 +207,26 @@ impl SimulationManager {
                 }
             } else {
                 break;
+            }
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(f) = self.requested_frame {
+            if self.frame_cache.len() as u32 <= f {
+                let start = instant::Instant::now();
+
+                let mut now = start;
+                while now.duration_since(start).as_millis() < 100 && self.frame_cache.len() as u32 <= f {
+                    self.run_frame();
+                    now = instant::Instant::now();
+                }
+            } else {
+                let frame = self.get_frame(f).clone();
+                let res = SimulationResponse::Frame(f, frame);
+
+                self.requested_frame = None;
+
+                self.interface_tx.ez_send(res);
             }
         }
     }
