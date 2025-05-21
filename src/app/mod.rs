@@ -320,7 +320,7 @@ impl<'a> AppState<'a> {
                             .selected_text(self.selected_trigger.clone())
                             .show_ui(ui, |ui| {
                             
-                            if ui.selectable_value(&mut self.selected_trigger, "Any particle left cicrular bound".into(), "Any particle left circular bound").clicked() {
+                            if ui.selectable_value(&mut self.selected_trigger, "Any particle left circular bound".into(), "Any particle left circular bound").clicked() {
                                 self.new_trigger = Some(crate::sim::event::TriggerManager::new(
                                     Box::new(crate::sim::event::AnyLeftCircleTrigger::new(1.0)), vec![]
                                 ));
@@ -414,6 +414,20 @@ impl<'a> AppState<'a> {
                     });
 
                     ui.separator();
+
+                    ui.heading("Simulation Properties");
+
+                    egui::Grid::new("sim-settings")
+                        .show(ui, |ui| {
+                        
+                        ui.label("Gravity");
+                        needs_update |= ui.add(egui::DragValue::new(&mut self.sim_initial_state.gravity_accel.x).speed(0.01).prefix("X:")).changed();
+                        needs_update |= ui.add(egui::DragValue::new(&mut self.sim_initial_state.gravity_accel.y).speed(0.01).prefix("Y:")).changed();
+
+                        ui.end_row();
+
+                        needs_update |= ui.checkbox(&mut self.sim_initial_state.particle_collisions, "Particle-particle collisions").changed();
+                    });
                     
                     if needs_update {
                         self.sim_render_state = self.sim_initial_state.clone();
