@@ -28,6 +28,9 @@ pub struct AppState<'a> {
     selected_trigger: String,
     new_trigger: Option<crate::sim::event::TriggerManager>,
 
+    selected_constraint: String,
+    new_constraint: Option<Box<dyn crate::sim::Constraint>>,
+
     window: &'a winit::window::Window
 }
 
@@ -157,6 +160,8 @@ impl<'a> AppState<'a> {
 
             selected_trigger: String::new(),
             new_trigger: None,
+            selected_constraint: String::new(),
+            new_constraint: None,
 
             window
         })
@@ -304,6 +309,7 @@ impl<'a> AppState<'a> {
                 });
 
                 egui::CentralPanel::default().show_inside(ui, |ui| {
+                    let mut needs_update = false;
                     
                     ui.horizontal(|ui| {
                         ui.heading("Triggers");
@@ -314,7 +320,7 @@ impl<'a> AppState<'a> {
                             .selected_text(self.selected_trigger.clone())
                             .show_ui(ui, |ui| {
                             
-                            if ui.selectable_value(&mut self.selected_trigger, "AnyLeftCricleTrigger".into(), "Any particle left circle").clicked() {
+                            if ui.selectable_value(&mut self.selected_trigger, "Any particle left cicrular bound".into(), "Any particle left circular bound").clicked() {
                                 self.new_trigger = Some(crate::sim::event::TriggerManager::new(
                                     Box::new(crate::sim::event::AnyLeftCircleTrigger::new(1.0)), vec![]
                                 ));
@@ -324,13 +330,12 @@ impl<'a> AppState<'a> {
                         if ui.button("+ Add").clicked() {
                             if let Some(t) = &self.new_trigger {
                                 self.sim_initial_state.add_trigger_manager(t.clone());
+                                needs_update = true;
                             }
                         }
                     });
 
                     use crate::sim::rendering::RenderableTool;
-
-                    let mut needs_update = false;
 
                     let mut id_salt = 0u32; 
 
@@ -363,8 +368,27 @@ impl<'a> AppState<'a> {
 
                     ui.separator();
 
-                    ui.heading("Constraints");
+                    ui.horizontal(|ui| {
+                        ui.heading("Constraints");
 
+                        ui.separator();
+
+                        egui::ComboBox::new("constraint-selector", "")
+                            .selected_text(self.selected_constraint.clone())
+                            .show_ui(ui, |ui| {
+                            
+                            if ui.selectable_value(&mut self.selected_constraint, "Circle".into(), "Circle").clicked() {
+                                self.new_constraint = Some(Box::new(crate::sim::constraints::CircleConstraint::new(1.0, 1.0)));
+                            }
+                        });
+
+                        if ui.button("+ Add").clicked() {
+                            if let Some(c) = &self.new_constraint {
+                                self.sim_initial_state.constraints.push(c.clone());
+                                needs_update = true;
+                            }
+                        }
+                    });
                     egui::ScrollArea::horizontal()
                         .id_salt("constraints-area")
                         .show(ui, |ui| {

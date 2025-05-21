@@ -1,3 +1,5 @@
+use std::mem::discriminant;
+
 pub mod rendering;
 pub mod event;
 pub mod constraints;
@@ -35,7 +37,7 @@ pub struct SimulationState {
 
     pub gravity_accel: glam::Vec2,
 
-    pub particle_collisions: bool
+    pub particle_collisions: bool,
 }
 
 pub enum SimulationCommand {
@@ -237,14 +239,18 @@ impl SimulationState {
                 };
 
                 let diff_centers = left.position - right.position;
-                let dst_centers = diff_centers.length();
-                let sum_radii = left.radius + right.radius;
-                let push_dst = (sum_radii - dst_centers).max(0.0);
-                let push_vec = (diff_centers / dst_centers) * push_dst;
+                let dst_centers_sq = diff_centers.length_squared();
+                let sum_radii_sq = (left.radius + right.radius) * (left.radius + right.radius);
+                
+                if dst_centers_sq < sum_radii_sq {
+                    let dst_centers = dst_centers_sq.sqrt();
+                    let push_dst = (left.radius + right.radius - dst_centers).max(0.0);
+                    let push_vec = (diff_centers / dst_centers) * push_dst;
 
-                // Apply half of the push to each (optional, more realistic)
-                left.position += push_vec * 0.5;
-                right.position -= push_vec * 0.5;
+                    // Apply half of the push to each (optional, more realistic)
+                    left.position += push_vec * 0.5;
+                    right.position -= push_vec * 0.5;
+                }
             }
         }
     }

@@ -13,13 +13,18 @@ dyn_clone::clone_trait_object!(SimTrigger);
 #[derive(Clone)]
 pub struct TriggerManager {
     trigger: Box<dyn SimTrigger>,
-    events: Vec<Box<dyn SimEvent>>
+    events: Vec<Box<dyn SimEvent>>,
+
+    selected_event: String,
+    new_event: Option<Box<dyn SimEvent>>
 }
 
 impl TriggerManager {
     pub fn new(trigger: Box<dyn SimTrigger>, events: Vec<Box<dyn SimEvent>>) -> Self {
         Self {
-            trigger, events
+            trigger, events,
+            selected_event: String::new(),
+            new_event: None
         }
     }
 
@@ -50,8 +55,29 @@ impl rendering::RenderableTool for TriggerManager {
                     });
                 });
                 changed |= self.trigger.draw(ui, id_salt).inner.0;
-            
-                ui.label("Events");
+           
+                ui.horizontal(|ui| {
+                    ui.label("Events");
+
+                    ui.separator();
+
+                    egui::ComboBox::new("event-selector", "")
+                        .selected_text(self.selected_event.clone())
+                        .show_ui(ui, |ui| {
+                        
+                        if ui.selectable_value(&mut self.selected_event, "Spawn Particle".into(), "Spawn Particle").clicked() {
+                            self.new_event = Some(Box::new(
+                                crate::sim::event::SpawnEvent { particle: crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED) }
+                            ));
+                        }
+                    });
+
+                    if ui.button("+ Add").clicked() {
+                        if let Some(e) = &self.new_event {
+                            self.events.push(e.clone());
+                        }
+                    }
+                });
                 let mut i = 0usize;
                 let mut remove = None; 
                 for event in &mut self.events {
@@ -75,7 +101,7 @@ impl rendering::RenderableTool for TriggerManager {
 
 #[derive(Clone)]
 pub struct SpawnEvent {
-    pub particle: super::Particle
+    pub particle: super::Particle,
 }
 
 impl SimEvent for SpawnEvent {
