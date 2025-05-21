@@ -71,7 +71,7 @@ impl rendering::RenderableTool for SpawnEvent {
     fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
         let mut changed = false;
 
-        let response = egui::Frame::group(ui.style())
+        egui::Frame::group(ui.style())
             .fill(egui::Color32::from_gray(30))
             .corner_radius(5.0)
             .inner_margin(10.0)
@@ -110,9 +110,9 @@ impl rendering::RenderableTool for SpawnEvent {
 
                 self.particle.color = crate::util::hsva_to_color32(hsva);
             });
-        }).response;
+            changed
+        })
 
-        egui::InnerResponse { inner: changed, response }
     }
 }
 
@@ -143,7 +143,7 @@ impl rendering::RenderableTool for AnyLeftCircleTrigger {
     fn draw(&mut self, ui: &mut egui::Ui) -> egui::InnerResponse<bool> {
         let mut changed = false;
 
-        let response = egui::Frame::group(ui.style())
+        egui::Frame::group(ui.style())
             .corner_radius(5.0)
             .inner_margin(10.0)
             .show(ui, |ui| {
@@ -155,8 +155,8 @@ impl rendering::RenderableTool for AnyLeftCircleTrigger {
                 ui.label("Radius:");
                 changed |= ui.add(egui::DragValue::new(&mut self.radius).speed(0.01)).changed();
             });
-        }).response;
+            changed
+        })
 
-        egui::InnerResponse { inner: response.changed(), response }
     }
 }

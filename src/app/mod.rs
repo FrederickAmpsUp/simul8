@@ -108,8 +108,8 @@ impl<'a> AppState<'a> {
 
         log::info!(" - Created EGUI objects.");
 
-        let (sim_manager_tx, sim_manager_rx) = futures::channel::mpsc::channel(16);
-        let (sim_interface_tx, sim_interface_rx) = futures::channel::mpsc::channel(16);
+        let (sim_manager_tx, sim_manager_rx) = flume::unbounded();
+        let (sim_interface_tx, sim_interface_rx) = flume::unbounded();
 
         let sim_manager = crate::sim::SimulationManager::new(sim_manager_tx, sim_interface_rx);
         let mut sim_interface = crate::sim::SimulationInterface::new(sim_interface_tx, sim_manager_rx);

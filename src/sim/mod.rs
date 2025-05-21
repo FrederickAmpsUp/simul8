@@ -49,8 +49,8 @@ pub enum SimulationResponse {
 }
 
 pub struct SimulationInterface {
-    manager_tx: futures::channel::mpsc::Sender<SimulationCommand>,
-    manager_rx: futures::channel::mpsc::Receiver<SimulationResponse>,
+    manager_tx: flume::Sender<SimulationCommand>,
+    manager_rx: flume::Receiver<SimulationResponse>,
 
     frame_cache: std::collections::BTreeMap<u32, SimulationState>,
     manager_cached: u32
@@ -61,25 +61,22 @@ pub struct SimulationManager {
 
     fps: f32,
 
-    interface_tx: futures::channel::mpsc::Sender<SimulationResponse>,
-    interface_rx: futures::channel::mpsc::Receiver<SimulationCommand>
+    interface_tx: flume::Sender<SimulationResponse>,
+    interface_rx: flume::Receiver<SimulationCommand>
 }
 
 trait EasySend<T> {
     fn ez_send(&mut self, data: T);
 }
 
-impl<T: Send + 'static> EasySend<T> for futures::channel::mpsc::Sender<T> {
+impl<T: Send + 'static> EasySend<T> for flume::Sender<T> {
     fn ez_send(&mut self, data: T) {
-        use futures::SinkExt;
-        let mut tx = self.clone();
-
-        crate::util::spawn(async move { let _ = tx.send(data).await; () });
+        let _ = self.send(data);
     }
 }
 
 impl SimulationInterface {
-    pub fn new(manager_tx: futures::channel::mpsc::Sender<SimulationCommand>, manager_rx: futures::channel::mpsc::Receiver<SimulationResponse>) -> Self {
+    pub fn new(manager_tx: flume::Sender<SimulationCommand>, manager_rx: flume::Receiver<SimulationResponse>) -> Self {
         Self {
             manager_tx, manager_rx, frame_cache: std::collections::BTreeMap::new(),
             manager_cached: 0
@@ -113,7 +110,7 @@ impl SimulationInterface {
 
     pub fn process_requests(&mut self) {
         loop {
-            if let Ok(Some(res)) = self.manager_rx.try_next() {
+            if let Ok(res) = self.manager_rx.try_recv() {
                 match res {
                     SimulationResponse::Frame(idx, frame) => {
                         let _ = self.frame_cache.insert(idx, frame);
@@ -139,7 +136,7 @@ impl SimulationInterface {
 }
 
 impl SimulationManager {
-    pub fn new(interface_tx: futures::channel::mpsc::Sender<SimulationResponse>, interface_rx: futures::channel::mpsc::Receiver<SimulationCommand>) -> Self {
+    pub fn new(interface_tx: flume::Sender<SimulationResponse>, interface_rx: flume::Receiver<SimulationCommand>) -> Self {
         Self {
             frame_cache: vec![],
             fps: 60.0,
@@ -175,7 +172,7 @@ impl SimulationManager {
 
     pub fn process_requests(&mut self) {
         loop {
-            if let Ok(Some(cmd)) = self.interface_rx.try_next() {
+            if let Ok(cmd) = self.interface_rx.try_recv() {
                 match cmd {
                     SimulationCommand::RequestFrame(frame_idx) => {
                         let frame = self.get_frame(frame_idx).clone();
