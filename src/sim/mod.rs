@@ -2,7 +2,7 @@ pub mod rendering;
 pub mod event;
 pub mod constraints;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Particle {
     pub position: glam::Vec2,
     pub last_position: glam::Vec2,
@@ -34,6 +34,8 @@ pub struct SimulationState {
     pub trigger_managers: Vec<event::TriggerManager>,
 
     pub gravity_accel: glam::Vec2,
+
+    pub particle_collisions: bool
 }
 
 pub enum SimulationCommand {
@@ -210,6 +212,7 @@ impl SimulationState {
             constraints: vec![],
             trigger_managers: vec![],
             gravity_accel: glam::Vec2::ZERO,
+            particle_collisions: false
         }
     }
 
@@ -222,6 +225,28 @@ impl SimulationState {
 
     pub fn add_trigger_manager(&mut self, manager: event::TriggerManager) {
         self.trigger_managers.push(manager);
+    }
+
+    fn solve_particle_collisions(&mut self) {
+        let len = self.particles.len();
+        for i in 0..len {
+            for j in (i + 1)..len {
+                let (left, right) = {
+                    let (head, tail) = self.particles.split_at_mut(j);
+                    (&mut head[i], &mut tail[0])
+                };
+
+                let diff_centers = left.position - right.position;
+                let dst_centers = diff_centers.length();
+                let sum_radii = left.radius + right.radius;
+                let push_dst = (sum_radii - dst_centers).max(0.0);
+                let push_vec = (diff_centers / dst_centers) * push_dst;
+
+                // Apply half of the push to each (optional, more realistic)
+                left.position += push_vec * 0.5;
+                right.position -= push_vec * 0.5;
+            }
+        }
     }
 
     fn solve_constraints(&mut self, steps: u32) {
@@ -243,6 +268,7 @@ impl SimulationState {
         }
 
         self.solve_constraints(1);
+        if self.particle_collisions { self.solve_particle_collisions(); }
     }
 
     fn update_triggers(&mut self) {

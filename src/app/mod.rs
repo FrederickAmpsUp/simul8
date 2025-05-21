@@ -130,6 +130,7 @@ impl<'a> AppState<'a> {
         sim_initial_state.add_constraint(crate::sim::constraints::CircleConstraint::new(1.0, 1.0));
 
         sim_initial_state.add_particle(crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED));
+        sim_initial_state.particle_collisions = true;
 
         sim_interface.store_frame(0, sim_initial_state.clone());
 
@@ -331,17 +332,22 @@ impl<'a> AppState<'a> {
 
                     let mut needs_update = false;
 
-                    let mut i = 0u32; 
+                    let mut id_salt = 0u32; 
 
                     egui::ScrollArea::horizontal()
                         .id_salt("managers-area")
                         .show(ui, |ui| {
-                        ui.horizontal(|ui| {
+                        ui.allocate_ui_with_layout(
+                                egui::Vec2::new(f32::INFINITY, 0.0),
+                                egui::Layout::left_to_right(egui::Align::Min),
+                                |ui| {
                             for manager in &mut self.sim_initial_state.trigger_managers {
-                                needs_update |= manager.draw(ui, &mut i).inner;
+                                needs_update |= manager.draw(ui, &mut id_salt).inner.0;
                             }
                         });
                     });
+
+                    ui.separator();
 
                     ui.heading("Constraints");
 
@@ -350,9 +356,11 @@ impl<'a> AppState<'a> {
                         .show(ui, |ui| {
                         
                         for constraint in &mut self.sim_initial_state.constraints {
-                            needs_update |= constraint.draw(ui, &mut i).inner;
+                            needs_update |= constraint.draw(ui, &mut id_salt).inner.0;
                         }
                     });
+
+                    ui.separator();
                     
                     if needs_update {
                         self.sim_render_state = self.sim_initial_state.clone();

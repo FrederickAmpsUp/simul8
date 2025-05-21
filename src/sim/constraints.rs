@@ -34,14 +34,18 @@ impl super::Constraint for CircleConstraint {
 }
 
 impl super::rendering::RenderableTool for CircleConstraint {
-    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<(bool, bool)> {
         let mut changed = false;
+        let mut remove = false;
         egui::Frame::group(ui.style())
             .corner_radius(5.0)
             .inner_margin(10.0)
             .show(ui, |ui| {
             
             ui.heading("Circle constraint");
+
+            remove = ui.button("X").on_hover_text("Remove").clicked();
+
             egui::Grid::new(format!("circle-settings{}", id_salt))
                 .show(ui, |ui| {
                 
@@ -54,7 +58,7 @@ impl super::rendering::RenderableTool for CircleConstraint {
                 changed |= ui.add(egui::DragValue::new(&mut self.elasticity).speed(0.01).range(0.0..=1.0)).changed();
             });
             *id_salt += 1;
-            changed
+            (changed, remove)
         })
     }
 }

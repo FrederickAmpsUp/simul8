@@ -33,24 +33,41 @@ impl TriggerManager {
 }
 
 impl rendering::RenderableTool for TriggerManager {
-    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<(bool, bool)> {
         egui::Frame::group(ui.style())
             .corner_radius(5.0)
             .inner_margin(10.0)
             .show(ui, |ui| {
             let mut changed = false;
+            let mut remove = false;
 
             ui.vertical(|ui| {
-                ui.label("Trigger");
-                changed |= self.trigger.draw(ui, id_salt).inner;
+                ui.horizontal(|ui| {
+                    ui.label("Trigger");
+
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::RIGHT), |ui| {
+                        remove = ui.button("X").on_hover_text("Remove").clicked();
+                    });
+                });
+                changed |= self.trigger.draw(ui, id_salt).inner.0;
             
                 ui.label("Events");
+                let mut i = 0usize;
+                let mut remove = None; 
                 for event in &mut self.events {
-                    changed |= event.draw(ui, id_salt).inner;
-                }
+                    let res = event.draw(ui, id_salt).inner;
+                    changed |= res.0;
 
+                    if res.1 {
+                        remove = Some(i);
+                    }
+                    i += 1;
+                }
+                if let Some(r) = remove {
+                    self.events.remove(r);
+                }
             });
-            changed
+            (changed, remove)
         })
     }
 }
@@ -68,7 +85,7 @@ impl SimEvent for SpawnEvent {
 
 
 impl rendering::RenderableTool for SpawnEvent {
-    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<(bool, bool)> {
         let mut changed = false;
 
         egui::Frame::group(ui.style())
@@ -111,7 +128,7 @@ impl rendering::RenderableTool for SpawnEvent {
                 self.particle.color = crate::util::hsva_to_color32(hsva);
             });
             *id_salt += 1;
-            changed
+            (changed, false)
         })
 
     }
@@ -141,7 +158,7 @@ impl SimTrigger for AnyLeftCircleTrigger {
 }
 
 impl rendering::RenderableTool for AnyLeftCircleTrigger {
-    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<bool> {
+    fn draw(&mut self, ui: &mut egui::Ui, id_salt: &mut u32) -> egui::InnerResponse<(bool, bool)> {
         let mut changed = false;
 
         egui::Frame::group(ui.style())
@@ -150,14 +167,14 @@ impl rendering::RenderableTool for AnyLeftCircleTrigger {
             .show(ui, |ui| {
             
             ui.heading("Any particle left circular bound");
-            
+           
             egui::Grid::new(format!("circle-settings{}", id_salt))
                 .show(ui, |ui| {
                 ui.label("Radius:");
                 changed |= ui.add(egui::DragValue::new(&mut self.radius).speed(0.01)).changed();
             });
             *id_salt += 1;
-            changed
+            (changed, false) // TODO: remove
         })
 
     }
