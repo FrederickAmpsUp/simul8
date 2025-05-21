@@ -61,10 +61,10 @@ impl rendering::RenderableTool for TriggerManager {
 
                     ui.separator();
 
-                    egui::ComboBox::new("event-selector", "")
+                    egui::ComboBox::new(format!("event-selector{}", id_salt), "")
                         .selected_text(self.selected_event.clone())
                         .show_ui(ui, |ui| {
-                        
+                        *id_salt += 1;
                         if ui.selectable_value(&mut self.selected_event, "Spawn Particle".into(), "Spawn Particle").clicked() {
                             self.new_event = Some(Box::new(
                                 crate::sim::event::SpawnEvent { particle: crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED) }
