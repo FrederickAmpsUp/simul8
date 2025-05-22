@@ -180,15 +180,6 @@ impl SimulationManager {
                 match cmd {
                     SimulationCommand::RequestFrame(frame_idx) => {
                         self.requested_frame = Some(frame_idx);
-
-                        #[cfg(target_arch = "wasm32")]
-                        {
-                        let frame = self.get_frame(frame_idx).clone();
-
-                        let res = SimulationResponse::Frame(frame_idx, frame);
-                        
-                        self.interface_tx.ez_send(res);
-                        }
                     },
                     SimulationCommand::StoreFrame(frame_idx, state) => {
                         let frame = self.get_frame_mut(frame_idx);
@@ -210,7 +201,6 @@ impl SimulationManager {
             }
         }
 
-        #[cfg(not(target_arch = "wasm32"))]
         if let Some(f) = self.requested_frame {
             if self.frame_cache.len() as u32 <= f {
                 let start = instant::Instant::now();
