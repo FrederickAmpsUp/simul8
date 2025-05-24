@@ -130,7 +130,7 @@ impl<'a> AppState<'a> {
             vec![Box::new(crate::sim::event::SpawnEvent { particle: crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED) })]
         ));
 
-        sim_initial_state.add_constraint(crate::sim::constraints::CircleConstraint::new(1.0, 1.0));
+        sim_initial_state.add_constraint(crate::sim::constraints::CircleConstraint::default());
 
         sim_initial_state.add_particle(crate::sim::Particle::new(glam::Vec2::ZERO, 0.05, egui::Color32::RED));
         sim_initial_state.particle_collisions = true;
@@ -379,7 +379,11 @@ impl<'a> AppState<'a> {
                             .show_ui(ui, |ui| {
                             
                             if ui.selectable_value(&mut self.selected_constraint, "Circle".into(), "Circle").clicked() {
-                                self.new_constraint = Some(Box::new(crate::sim::constraints::CircleConstraint::new(1.0, 1.0)));
+                                self.new_constraint = Some(Box::new(crate::sim::constraints::CircleConstraint::default()));
+                            }
+
+                            if ui.selectable_value(&mut self.selected_constraint, "Circle With Hole".into(), "Circle With Hole").clicked() {
+                                self.new_constraint = Some(Box::new(crate::sim::constraints::HoleCircleConstraint::default()));
                             }
                         });
 

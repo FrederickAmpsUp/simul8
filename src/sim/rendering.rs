@@ -88,7 +88,7 @@ impl SimRenderer for CpuSimRenderer {
 
         let thickness = self.viewport.sim_units_to_logical_points(thickness, vw);
 
-        ui.painter().circle_stroke(egui::pos2(c_x, c_y), radius, egui::Stroke::new(thickness, color)); 
+        ui.painter().circle_stroke(egui::pos2(c_x, c_y), radius, egui::Stroke::new(thickness, color));
     }
 
     fn circle_filled(&self, center: glam::Vec2, radius: f32, color: egui::Color32, ui: &mut egui::Ui, render_state: &RenderState) {
